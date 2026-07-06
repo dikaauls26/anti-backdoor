@@ -1,0 +1,13 @@
+# Secrets and runtime data
+panel/panel.conf
+panel/panel.pem
+panel/jobs/
+panel/data/
+panel/quar_store/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~

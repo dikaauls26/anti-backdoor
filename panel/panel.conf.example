@@ -1,0 +1,15 @@
+# Security Panel configuration
+# Copy to panel.conf and edit values
+
+USERNAME=scanadmin
+PASSWORD=changeme
+PORT=9793
+
+# Default domain path (for WP user audit)
+DOMAIN_PATH=/home/example.com/public_html
+
+# Comma-separated glob patterns for web roots
+WEB_ROOTS=/home/*/public_html
+
+# maldet scan log location
+SCAN_LOG=/root/maldet_scan.log

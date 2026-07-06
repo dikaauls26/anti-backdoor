@@ -1,0 +1,13 @@
+[Unit]
+Description=Anti-Backdoor Security Panel (ClamAV + maldet + rkhunter + AIDE + Lynis)
+After=network.target mariadb.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/maldetect-panel/panel.py
+Restart=on-failure
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

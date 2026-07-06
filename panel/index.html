@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel Keamanan Server</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+<style>
+:root{--sidebar-w:260px;--sidebar-bg:#fff;--accent:#0d6efd}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f4f6f9;color:#212529}
+#sidebar{width:var(--sidebar-w);min-height:100vh;background:var(--sidebar-bg);border-right:1px solid #dee2e6;position:fixed;top:0;left:0;z-index:1040;display:flex;flex-direction:column}
+#sidebar .brand{padding:1.25rem 1rem;border-bottom:1px solid #eee;font-weight:700;font-size:1.05rem;color:#0d6efd}
+#sidebar .nav-link{color:#495057;border-radius:8px;margin:2px 10px;padding:.55rem .85rem;font-size:.9rem}
+#sidebar .nav-link:hover{background:#f0f4ff;color:#0d6efd}
+#sidebar .nav-link.active{background:#e7f1ff;color:#0d6efd;font-weight:600}
+#main{margin-left:var(--sidebar-w);min-height:100vh}
+.topbar{background:#fff;border-bottom:1px solid #dee2e6;padding:.75rem 1.5rem;position:sticky;top:0;z-index:1030}
+.content{padding:1.5rem}
+.stat-card{border:0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:transform .15s}
+.stat-card:hover{transform:translateY(-2px)}
+.stat-card .icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem}
+.score-badge{font-weight:700;padding:.25rem .55rem;border-radius:6px;font-size:.8rem}
+.score-hi{background:#fde8e8;color:#c92a2a}
+.score-mid{background:#fff3bf;color:#e67700}
+.score-lo{background:#d3f9d8;color:#2b8a3e}
+.path-cell{font-family:Consolas,monospace;font-size:.8rem;word-break:break-all}
+.chip{display:inline-block;background:#e7f5ff;color:#1864ab;border-radius:4px;padding:1px 6px;margin:1px;font-size:.72rem}
+.chip.danger{background:#ffe3e3;color:#c92a2a}
+.empty-hint{text-align:center;padding:2.5rem 1rem;color:#868e96}
+.empty-hint i{font-size:2.5rem;opacity:.5}
+.btn-act{white-space:nowrap}
+.updates-hero{background:linear-gradient(135deg,#0d6efd 0%,#6610f2 55%,#0dcaf0 100%);border-radius:16px;color:#fff;padding:2rem 2.25rem;position:relative;overflow:hidden}
+.updates-hero::after{content:'';position:absolute;top:-40%;right:-10%;width:280px;height:280px;background:rgba(255,255,255,.08);border-radius:50%}
+.updates-hero .ver{display:inline-block;background:rgba(255,255,255,.2);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:.25rem .85rem;font-size:.8rem;font-weight:600}
+.feature-tile{border:0;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);transition:transform .15s,box-shadow .15s;height:100%}
+.feature-tile:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(13,110,253,.12)}
+.feature-tile .ft-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;margin-bottom:.75rem}
+.timeline{position:relative;padding-left:2rem}
+.timeline::before{content:'';position:absolute;left:.55rem;top:0;bottom:0;width:2px;background:linear-gradient(#0d6efd,#dee2e6)}
+.tl-item{position:relative;padding-bottom:1.75rem}
+.tl-item:last-child{padding-bottom:0}
+.tl-dot{position:absolute;left:-1.65rem;top:.2rem;width:14px;height:14px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px #0d6efd}
+.tl-card{border:0;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.tl-card .card-header{background:#fff;border-bottom:1px solid #f0f0f0;border-radius:12px 12px 0 0!important;padding:.75rem 1.25rem}
+.tech-badge{display:inline-flex;align-items:center;gap:.35rem;background:#f8f9fa;border:1px solid #e9ecef;border-radius:8px;padding:.35rem .7rem;font-size:.78rem;margin:.15rem}
+.stat-pill{text-align:center;padding:1rem;border-radius:12px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.stat-pill .num{font-size:1.6rem;font-weight:700;color:#0d6efd;line-height:1.2}
+.stat-pill .lbl{font-size:.75rem;color:#868e96;margin-top:.15rem}
+.code-view{font-family:Consolas,'Courier New',monospace;font-size:.78rem;background:#1e1e2e;color:#cdd6f4;border-radius:10px;max-height:440px;overflow:auto;padding:.5rem 0}
+.code-line{display:flex;line-height:1.45}
+.code-line.hl{background:rgba(220,53,69,.22)}
+.code-ln{color:#6c7086;min-width:3.2rem;text-align:right;padding:0 .75rem;user-select:none;border-right:1px solid #313244;margin-right:.5rem;flex-shrink:0}
+.code-txt{white-space:pre-wrap;word-break:break-all;padding-right:.75rem}
+.path-link{cursor:pointer}
+.path-link:hover{text-decoration:underline!important}
+.probe-box{border-radius:10px;padding:1rem;font-size:.85rem}
+.probe-box.danger{background:#fde8e8;border:1px solid #f5c2c7}
+.probe-box.warning{background:#fff3cd;border:1px solid #ffecb5}
+.probe-box.success{background:#d1e7dd;border:1px solid #badbcc}
+.probe-box.info{background:#cff4fc;border:1px solid #b6effb}
+.probe-box.secondary{background:#f8f9fa;border:1px solid #dee2e6}
+pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:1rem;font-size:.8rem;max-height:400px;overflow:auto}
+@media(max-width:768px){#sidebar{transform:translateX(-100%)}#sidebar.show{transform:translateX(0)}#main{margin-left:0}}
+</style>
+</head>
+<body>
+
+<nav id="sidebar">
+  <div class="brand"><i class="bi bi-shield-check me-2"></i>Security Panel</div>
+  <div class="p-2 flex-grow-1">
+    <ul class="nav flex-column">
+      <li class="nav-item"><a class="nav-link active" href="#" data-page="dash"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" data-page="scan"><i class="bi bi-search me-2"></i>Scan</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" data-page="findings"><i class="bi bi-bug me-2"></i>Temuan Virus</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" data-page="system"><i class="bi bi-hdd-network me-2"></i>Scan Sistem</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" data-page="quar"><i class="bi bi-archive me-2"></i>Karantina</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" data-page="whitelist"><i class="bi bi-check-circle me-2"></i>Whitelist</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" data-page="jobs"><i class="bi bi-clock-history me-2"></i>Riwayat Job</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" data-page="docs"><i class="bi bi-book me-2"></i>Bantuan</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" data-page="updates"><i class="bi bi-stars me-2"></i>Updates</a></li>
+    </ul>
+  </div>
+  <div class="p-3 border-top small text-muted">v4.3 &middot; ClamAV + rkhunter + AIDE + Lynis</div>
+</nav>
+
+<div id="main">
+  <div class="topbar d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <button class="btn btn-outline-secondary btn-sm d-md-none" id="btnToggleSidebar"><i class="bi bi-list"></i></button>
+      <h5 class="mb-0 fw-semibold" id="pageTitle">Dashboard</h5>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <label class="small text-muted mb-0">Domain:</label>
+      <select id="domainsel" class="form-select form-select-sm" style="min-width:200px" onchange="onDomainChange()"></select>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- DASHBOARD -->
+    <div class="page" id="page-dash">
+      <div class="row g-3 mb-4" id="statuscards"><div class="col-12 text-center py-4"><div class="spinner-border text-primary"></div></div></div>
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold"><i class="bi bi-activity me-2"></i>Job Sedang Berjalan</div>
+        <div class="card-body" id="runningjobs"><span class="text-muted">Memuat...</span></div>
+      </div>
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white d-flex flex-wrap align-items-center gap-2">
+          <span class="fw-semibold"><i class="bi bi-wordpress text-primary me-2"></i>User WordPress</span>
+          <span id="wpmeta" class="small text-muted"></span>
+          <button class="btn btn-outline-primary btn-sm ms-auto" onclick="loadWpUsers()"><i class="bi bi-arrow-clockwise me-1"></i>Muat Ulang</button>
+        </div>
+        <div class="card-body">
+          <div id="wp-empty" class="empty-hint d-none">
+            <i class="bi bi-wordpress d-block"></i>
+            <p class="mb-0 mt-2" id="wp-empty-msg">Pilih domain WordPress untuk melihat daftar user.</p>
+          </div>
+          <div id="wp-table-wrap">
+            <table id="tblWpUsers" class="table table-hover table-sm w-100"><thead><tr>
+              <th>Risiko</th><th>Username</th><th>Email</th><th>Role</th><th>Terdaftar</th><th>Catatan</th><th>Aksi</th>
+            </tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCAN -->
+    <div class="page d-none" id="page-scan">
+      <p class="text-muted small mb-3">Semua scan berjalan di <strong>background</strong> untuk domain yang dipilih. Panel tetap responsif.</p>
+      <div class="row g-3">
+        <div class="col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-code-slash text-danger me-1"></i> Scan Anti-Backdoor</h6>
+              <p class="small text-muted">Deteksi webshell: eval, exec, base64_decode, obfuscation.</p>
+              <div class="input-group input-group-sm mb-2"><span class="input-group-text">Threshold</span><input type="number" id="bdth" class="form-control" value="8"></div>
+              <button class="btn btn-danger btn-sm w-100" onclick="runAction('backdoor','&threshold='+$('#bdth').val())"><i class="bi bi-play-fill"></i> Mulai Scan</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-virus text-warning me-1"></i> Scan Malware</h6>
+              <p class="small text-muted">ClamAV + maldet signature (51rb+ virus dikenal).</p>
+              <button class="btn btn-warning btn-sm w-100 mt-4" onclick="runAction('malware','')"><i class="bi bi-play-fill"></i> Mulai Scan</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-file-earmark-plus text-info me-1"></i> File Baru</h6>
+              <p class="small text-muted">File yang dibuat/diubah dalam N hari terakhir.</p>
+              <div class="input-group input-group-sm mb-2"><span class="input-group-text">Hari</span><input type="number" id="nfdays" class="form-control" value="3"></div>
+              <button class="btn btn-info btn-sm w-100 text-white" onclick="runAction('newfiles','&days='+$('#nfdays').val())"><i class="bi bi-play-fill"></i> Deteksi</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-arrow-repeat text-secondary me-1"></i> Update DB</h6>
+              <p class="small text-muted">Perbarui signature virus ClamAV.</p>
+              <button class="btn btn-secondary btn-sm w-100 mt-4" onclick="runAction('updatedb','')"><i class="bi bi-cloud-download"></i> Update Sekarang</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+      <h6 class="fw-semibold mb-1"><i class="bi bi-hdd-network text-primary me-1"></i> Scan Level Sistem</h6>
+      <p class="text-muted small mb-3">Memeriksa <strong>seluruh server/OS</strong> — bukan per-domain. Hasil di menu <b>Scan Sistem</b>.</p>
+      <div class="row g-3">
+        <div class="col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-shield-shaded text-danger me-1"></i> rkhunter</h6>
+              <p class="small text-muted mb-2">Rootkit, backdoor OS, file tersembunyi. ~2-4 mnt. Cron 03:00.</p>
+              <button class="btn btn-primary btn-sm w-100" onclick="runAction('rkhunter','')"><i class="bi bi-play-fill"></i> Scan</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-fingerprint text-success me-1"></i> AIDE</h6>
+              <p class="small text-muted mb-2">Deteksi perubahan file sistem (integritas). Cron 04:00.</p>
+              <button class="btn btn-success btn-sm w-100 mb-1" onclick="runAction('aide','')"><i class="bi bi-play-fill"></i> Cek Perubahan</button>
+              <button class="btn btn-outline-secondary btn-sm w-100" onclick="runAction('aideinit','')"><i class="bi bi-database"></i> Update Baseline</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-clipboard-check text-info me-1"></i> Lynis</h6>
+              <p class="small text-muted mb-2">Audit hardening &amp; konfigurasi keamanan server. ~3-5 mnt.</p>
+              <button class="btn btn-info btn-sm w-100 text-white" onclick="runAction('lynis','')"><i class="bi bi-play-fill"></i> Audit</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-arrow-repeat text-secondary me-1"></i> Update rkhunter</h6>
+              <p class="small text-muted mb-2">Perbarui DB rkhunter + baseline (setelah apt upgrade).</p>
+              <button class="btn btn-secondary btn-sm w-100" onclick="runAction('rkupdate','')"><i class="bi bi-cloud-download"></i> Update</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FINDINGS -->
+    <div class="page d-none" id="page-findings">
+      <ul class="nav nav-tabs mb-3" id="findTabs">
+        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-backdoor">Backdoor <span class="badge bg-danger" id="bd-count">0</span></a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-malware">Malware <span class="badge bg-warning text-dark" id="mal-count">0</span></a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-newfiles">File Baru <span class="badge bg-info" id="nf-count">0</span></a></li>
+      </ul>
+      <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+        <button class="btn btn-outline-primary btn-sm" onclick="loadFindings()"><i class="bi bi-arrow-clockwise"></i> Muat Ulang</button>
+        <select id="minscore" class="form-select form-select-sm" style="width:auto" onchange="renderFindings()">
+          <option value="0">Skor: semua</option><option value="8">Skor &ge; 8</option><option value="12" selected>Skor &ge; 12</option>
+        </select>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="hidewl" checked onchange="renderFindings()"><label class="form-check-label small" for="hidewl">Sembunyikan whitelist</label></div>
+        <span id="findmeta" class="small text-muted ms-auto"></span>
+      </div>
+      <div class="alert alert-light border small mb-3 py-2">
+        <i class="bi bi-info-circle text-primary me-1"></i>
+        <strong>Karantina</strong> — isolasi file berbahaya (tidak bisa diakses web).
+        <span class="mx-2 text-muted">|</span>
+        <strong>Whitelist</strong> — tandai file sah, tidak akan diflag / dikarantina.
+        <span class="mx-2 text-muted">|</span>
+        <strong>Detail</strong> — klik nama file untuk lihat source code &amp; test URL backdoor.
+      </div>
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-backdoor">
+          <div id="bd-empty" class="empty-hint d-none">
+            <i class="bi bi-shield-check d-block"></i>
+            <p class="mb-0 mt-2">Belum ada temuan backdoor.<br>Pilih domain, lalu jalankan <strong>Scan Anti-Backdoor</strong> di menu Scan.</p>
+          </div>
+          <div class="card border-0 shadow-sm" id="bd-table-wrap"><div class="card-body">
+            <table id="tblBackdoor" class="table table-hover table-sm w-100"><thead><tr>
+              <th>Skor</th><th>File</th><th>Indikasi</th><th>Owner</th><th>Diubah</th><th>Aksi</th>
+            </tr></thead><tbody></tbody></table>
+          </div></div>
+        </div>
+        <div class="tab-pane fade" id="tab-malware">
+          <p id="malsummary" class="small text-muted"></p>
+          <div id="mal-empty" class="empty-hint d-none">
+            <i class="bi bi-virus d-block"></i>
+            <p class="mb-0 mt-2">Belum ada temuan malware.<br>Jalankan <strong>Scan Malware (ClamAV)</strong> di menu Scan.</p>
+          </div>
+          <div class="card border-0 shadow-sm" id="mal-table-wrap"><div class="card-body">
+            <table id="tblMalware" class="table table-hover table-sm w-100"><thead><tr>
+              <th>Signature</th><th>File</th><th>Aksi</th>
+            </tr></thead><tbody></tbody></table>
+          </div></div>
+        </div>
+        <div class="tab-pane fade" id="tab-newfiles">
+          <div id="nf-empty" class="empty-hint d-none">
+            <i class="bi bi-file-earmark-plus d-block"></i>
+            <p class="mb-0 mt-2">Belum ada daftar file baru.<br>Jalankan <strong>Deteksi File Baru</strong> di menu Scan.</p>
+          </div>
+          <div class="card border-0 shadow-sm" id="nf-table-wrap"><div class="card-body">
+            <table id="tblNewfiles" class="table table-hover table-sm w-100"><thead><tr>
+              <th>Diubah</th><th>File</th><th>Ukuran</th><th>Owner</th><th>Aksi</th>
+            </tr></thead><tbody></tbody></table>
+          </div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SYSTEM SCAN -->
+    <div class="page d-none" id="page-system">
+      <ul class="nav nav-tabs mb-3" id="sysTabs">
+        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#sys-rk" onclick="setTimeout(renderFindings,50)">rkhunter <span class="badge bg-danger" id="rk-tab-count">0</span></a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sys-aide" onclick="setTimeout(renderFindings,50)">AIDE <span class="badge bg-success" id="aide-tab-count">0</span></a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sys-lynis" onclick="setTimeout(renderFindings,50)">Lynis <span class="badge bg-info text-dark" id="lyn-tab-count">0</span></a></li>
+      </ul>
+      <div class="tab-content">
+        <!-- RKHUNTER -->
+        <div class="tab-pane fade show active" id="sys-rk">
+          <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+            <button class="btn btn-primary btn-sm" onclick="runAction('rkhunter','')"><i class="bi bi-play-fill me-1"></i>Scan rkhunter</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="runAction('rkupdate','')"><i class="bi bi-database me-1"></i>Update DB</button>
+            <button class="btn btn-outline-primary btn-sm" onclick="loadFindings()"><i class="bi bi-arrow-clockwise me-1"></i>Muat Ulang</button>
+            <div class="form-check ms-2"><input class="form-check-input" type="checkbox" id="rkhidebenign" checked onchange="renderFindings()"><label class="form-check-label small" for="rkhidebenign">Sembunyikan false-positive</label></div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="small text-muted">Perlu Ditinjau</div><div class="fs-4 fw-bold" id="rk-real">-</div></div></div></div>
+            <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="small text-muted">Prioritas Tinggi</div><div class="fs-4 fw-bold text-danger" id="rk-high">-</div></div></div></div>
+            <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="small text-muted">Diabaikan</div><div class="fs-4 fw-bold text-muted" id="rk-benign">-</div></div></div></div>
+            <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="small text-muted">Terakhir</div><div class="fw-semibold small" id="rk-when">-</div></div></div></div>
+          </div>
+          <div id="rk-empty" class="empty-hint d-none"><i class="bi bi-hdd-network d-block"></i><p class="mb-0 mt-2">Belum ada hasil. Jalankan scan rkhunter.</p></div>
+          <div class="card border-0 shadow-sm" id="rk-table-wrap"><div class="card-body">
+            <table id="tblRk" class="table table-hover table-sm w-100"><thead><tr>
+              <th>Severity</th><th>Peringatan</th><th>Detail</th><th>Status</th>
+            </tr></thead><tbody></tbody></table>
+          </div></div>
+        </div>
+        <!-- AIDE -->
+        <div class="tab-pane fade" id="sys-aide">
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <button class="btn btn-success btn-sm" onclick="runAction('aide','')"><i class="bi bi-play-fill me-1"></i>Cek Perubahan File</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="runAction('aideinit','')"><i class="bi bi-database me-1"></i>Update Baseline</button>
+            <button class="btn btn-outline-primary btn-sm" onclick="loadFindings()"><i class="bi bi-arrow-clockwise me-1"></i>Muat Ulang</button>
+            <div class="form-check ms-2"><input class="form-check-input" type="checkbox" id="aidehidebenign" checked onchange="renderFindings()"><label class="form-check-label small" for="aidehidebenign">Sembunyikan log/tmp</label></div>
+          </div>
+          <div class="alert alert-light border small mb-3 py-2">
+            <i class="bi bi-fingerprint text-success me-1"></i>
+            <strong>AIDE</strong> membandingkan file saat ini dengan baseline. File <b>Added/Changed</b> di <code>/home/</code> bisa indikasi backdoor baru.
+            Jalankan <b>Update Baseline</b> setelah update sistem yang sah.
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="small text-muted">Perubahan</div><div class="fs-4 fw-bold" id="aide-real">-</div></div></div></div>
+            <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="small text-muted">Prioritas Tinggi</div><div class="fs-4 fw-bold text-danger" id="aide-high">-</div></div></div></div>
+            <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="small text-muted">Status</div><div class="fw-semibold small" id="aide-status">-</div></div></div></div>
+            <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="small text-muted">Terakhir</div><div class="fw-semibold small" id="aide-when">-</div></div></div></div>
+          </div>
+          <div id="aide-empty" class="empty-hint d-none"><i class="bi bi-fingerprint d-block"></i><p class="mb-0 mt-2">Belum ada hasil AIDE.<br>Jalankan <b>Cek Perubahan File</b> (butuh baseline — klik Update Baseline jika pertama kali).</p></div>
+          <div class="card border-0 shadow-sm" id="aide-table-wrap"><div class="card-body">
+            <table id="tblAide" class="table table-hover table-sm w-100"><thead><tr>
+              <th>Severity</th><th>Tipe</th><th>File</th><th>Status</th>
+            </tr></thead><tbody></tbody></table>
+          </div></div>
+        </div>
+        <!-- LYNIS -->
+        <div class="tab-pane fade" id="sys-lynis">
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <button class="btn btn-info btn-sm text-white" onclick="runAction('lynis','')"><i class="bi bi-play-fill me-1"></i>Audit Lynis</button>
+            <button class="btn btn-outline-primary btn-sm" onclick="loadFindings()"><i class="bi bi-arrow-clockwise me-1"></i>Muat Ulang</button>
+          </div>
+          <div class="alert alert-light border small mb-3 py-2">
+            <i class="bi bi-clipboard-check text-info me-1"></i>
+            <strong>Lynis</strong> audit konfigurasi keamanan: SSH, firewall, kernel, permissions, malware indicators.
+            Skor <b>Hardening Index</b> lebih tinggi = server lebih aman (ideal 70+).
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="small text-muted">Hardening Score</div><div class="fs-4 fw-bold text-primary" id="lyn-score">-</div></div></div></div>
+            <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="small text-muted">Warning</div><div class="fs-4 fw-bold text-warning" id="lyn-warn">-</div></div></div></div>
+            <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="small text-muted">Saran</div><div class="fs-4 fw-bold" id="lyn-sug">-</div></div></div></div>
+            <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="small text-muted">Terakhir</div><div class="fw-semibold small" id="lyn-when">-</div></div></div></div>
+          </div>
+          <div id="lyn-empty" class="empty-hint d-none"><i class="bi bi-clipboard-check d-block"></i><p class="mb-0 mt-2">Belum ada audit Lynis.<br>Klik <b>Audit Lynis</b> untuk memeriksa hardening server.</p></div>
+          <div class="card border-0 shadow-sm" id="lyn-table-wrap"><div class="card-body">
+            <table id="tblLynis" class="table table-hover table-sm w-100"><thead><tr>
+              <th>Severity</th><th>Tipe</th><th>Temuan</th>
+            </tr></thead><tbody></tbody></table>
+          </div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUARANTINE -->
+    <div class="page d-none" id="page-quar">
+      <div id="quarAlert" class="alert alert-danger d-none small">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        <b id="quarAlertMsg">Ada file yang muncul lagi setelah dikarantina!</b> Malware aktif membuat ulang file.
+        Klik <b>Sweep Karantina</b> untuk hapus ulang, lalu hapus sumber infeksi (plugin wp-compat, webshell).
+      </div>
+      <div class="d-flex gap-2 mb-3">
+        <button class="btn btn-danger btn-sm" onclick="quarSweep()"><i class="bi bi-shield-x me-1"></i>Sweep Karantina</button>
+        <button class="btn btn-outline-primary btn-sm" onclick="loadFindings()"><i class="bi bi-arrow-clockwise me-1"></i>Muat Ulang</button>
+      </div>
+      <div class="card border-0 shadow-sm"><div class="card-body">
+        <h6 class="fw-semibold mb-3"><i class="bi bi-archive text-warning"></i> File Dikarantina</h6>
+        <p class="small text-muted">Karantina memindah file ke gudang aman. Jika malware masih aktif, file bisa <b>muncul lagi</b> di path asli — gunakan Sweep.</p>
+        <table id="tblQuar" class="table table-hover table-sm w-100"><thead><tr>
+          <th>Waktu</th><th>File Asli</th><th>Status</th><th>Alasan</th><th>Aksi</th>
+        </tr></thead><tbody></tbody></table>
+      </div></div>
+    </div>
+
+    <!-- WHITELIST -->
+    <div class="page d-none" id="page-whitelist">
+      <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+        <h6 class="fw-semibold mb-2">Tambah ke Whitelist</h6>
+        <div class="input-group"><input id="wlpath" class="form-control" placeholder="/home/domain/public_html/installer.php">
+        <button class="btn btn-success" onclick="wlAdd()"><i class="bi bi-plus-lg"></i> Tambah</button></div>
+        <p class="small text-muted mt-2 mb-0">File whitelist tidak bisa dikarantina selama status ON (contoh: installer.php Duplicator).</p>
+      </div></div>
+      <div class="card border-0 shadow-sm"><div class="card-body">
+        <table id="tblWl" class="table table-hover table-sm w-100"><thead><tr>
+          <th>Status</th><th>File</th><th>Ditambah</th><th>Aksi</th>
+        </tr></thead><tbody></tbody></table>
+      </div></div>
+    </div>
+
+    <!-- JOBS -->
+    <div class="page d-none" id="page-jobs">
+      <button class="btn btn-outline-primary btn-sm mb-3" onclick="loadJobs()"><i class="bi bi-arrow-clockwise"></i> Muat Ulang</button>
+      <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+        <table id="tblJobs" class="table table-hover table-sm w-100"><thead><tr>
+          <th>Status</th><th>Judul</th><th>Mulai</th><th>Info Terakhir</th><th>Aksi</th>
+        </tr></thead><tbody></tbody></table>
+      </div></div>
+      <div id="joblogwrap" class="d-none">
+        <h6 id="joblogtitle" class="text-muted"></h6>
+        <pre class="logbox" id="joblog"></pre>
+      </div>
+    </div>
+
+    <!-- DOCS -->
+    <div class="page d-none" id="page-docs">
+      <div class="accordion" id="docsAcc">
+        <div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#d1">Alur Pakai</button></h2>
+        <div id="d1" class="accordion-collapse collapse show" data-bs-parent="#docsAcc"><div class="accordion-body small">
+          <ol><li>Pilih <b>Domain</b> di kanan atas</li><li>Tab <b>Scan</b> &rarr; jalankan scan</li><li>Tab <b>Temuan Virus</b> &rarr; lihat hasil di DataTables</li><li>Karantina file berbahaya atau Whitelist file sah</li></ol>
+        </div></div></div>
+        <div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#d2">Jenis Scan</button></h2>
+        <div id="d2" class="accordion-collapse collapse" data-bs-parent="#docsAcc"><div class="accordion-body small">
+          <p><b>Anti-Backdoor</b> — heuristik pola berbahaya di file PHP. Menangkap backdoor custom yang lolos antivirus.</p>
+          <p><b>Malware</b> — signature ClamAV + maldet (51rb+ tanda tangan).</p>
+          <p><b>File Baru</b> — file yang berubah dalam N hari terakhir.</p>
+          <p><b>Scan Sistem (rkhunter)</b> — memeriksa level OS: rootkit, backdoor kernel, binary sistem yang diubah, file/proses tersembunyi. Berlaku seluruh server, bukan per-domain. Warning berlabel <em>aman</em> = false-positive umum OpenLiteSpeed. <b>Otomatis setiap hari jam 03:00.</b></p>
+          <p><b>User WordPress</b> — daftar user di dashboard (pilih domain). User mencurigakan ditandai merah/kuning. <b>Nonaktifkan</b> = turunkan ke subscriber. <b>Karantina</b> = kunci password + turunkan role.</p>
+        </div></div></div>
+        <div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#d3">Skor Risiko</button></h2>
+        <div id="d3" class="accordion-collapse collapse" data-bs-parent="#docsAcc"><div class="accordion-body small">
+          <p><span class="score-badge score-hi">&ge;12</span> Sangat berbahaya — kemungkinan webshell/backdoor</p>
+          <p><span class="score-badge score-mid">8-11</span> Mencurigakan — perlu ditinjau manual</p>
+          <p><span class="score-badge score-lo">6-7</span> Waspada — sering false-positive (library sah)</p>
+        </div></div></div>
+        <div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#d4">Karantina vs Whitelist</button></h2>
+        <div id="d4" class="accordion-collapse collapse" data-bs-parent="#docsAcc"><div class="accordion-body small">
+          <p><b>Karantina</b> — file dipindah ke gudang aman, tidak bisa diakses/dieksekusi. Bisa dipulihkan.</p>
+          <p><b>Whitelist ON</b> — file ditandai aman, tidak bisa dikarantina &amp; disembunyikan dari daftar bahaya.</p>
+        </div></div></div>
+      </div>
+    </div>
+
+    <!-- UPDATES NOTE -->
+    <div class="page d-none" id="page-updates">
+      <div class="updates-hero mb-4">
+        <div class="position-relative" style="z-index:1">
+          <span class="ver mb-2 d-inline-block"><i class="bi bi-stars me-1"></i> Panel Keamanan v4.2</span>
+          <h4 class="fw-bold mb-2">Security Monitoring Panel</h4>
+          <p class="mb-3 opacity-90" style="max-width:620px">Panel keamanan terpusat untuk server CyberPanel + OpenLiteSpeed. Memantau malware, backdoor, rootkit, dan user WordPress mencurigakan — semua dari satu antarmuka.</p>
+          <div class="d-flex flex-wrap gap-2">
+            <span class="tech-badge bg-white bg-opacity-25 border-0 text-white"><i class="bi bi-shield-check"></i> HTTPS + Auth</span>
+            <span class="tech-badge bg-white bg-opacity-25 border-0 text-white"><i class="bi bi-server"></i> 16 Domain</span>
+            <span class="tech-badge bg-white bg-opacity-25 border-0 text-white"><i class="bi bi-calendar-check"></i> 6 Juli 2026</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3"><div class="stat-pill"><div class="num">7</div><div class="lbl">Jenis Scan</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-pill"><div class="num">16</div><div class="lbl">Domain Terpantau</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-pill"><div class="num">51K+</div><div class="lbl">Signature Malware</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-pill"><div class="num">24/7</div><div class="lbl">Cron Harian</div></div></div>
+      </div>
+
+      <h6 class="fw-semibold mb-3"><i class="bi bi-grid-3x3-gap text-primary me-2"></i>Semua Fitur</h6>
+      <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-4">
+          <div class="card feature-tile"><div class="card-body">
+            <div class="ft-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-code-slash"></i></div>
+            <h6 class="fw-semibold">Scan Anti-Backdoor</h6>
+            <p class="small text-muted mb-2">Heuristik pola berbahaya di file PHP: <code>eval</code>, <code>exec</code>, <code>base64_decode</code>, obfuscation, webshell terkenal (c99, WSO, IndoXploit).</p>
+            <span class="badge bg-light text-dark border">Per-domain</span> <span class="badge bg-light text-dark border">Skor risiko</span>
+          </div></div>
+        </div>
+        <div class="col-md-6 col-xl-4">
+          <div class="card feature-tile"><div class="card-body">
+            <div class="ft-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-virus"></i></div>
+            <h6 class="fw-semibold">Scan Malware</h6>
+            <p class="small text-muted mb-2">ClamAV 0.103 + Linux Malware Detect (maldet) dengan 51.000+ signature virus, trojan, dan webshell yang dikenal.</p>
+            <span class="badge bg-light text-dark border">Per-domain</span> <span class="badge bg-light text-dark border">Background job</span>
+          </div></div>
+        </div>
+        <div class="col-md-6 col-xl-4">
+          <div class="card feature-tile"><div class="card-body">
+            <div class="ft-icon bg-info bg-opacity-10 text-info"><i class="bi bi-file-earmark-plus"></i></div>
+            <h6 class="fw-semibold">Deteksi File Baru</h6>
+            <p class="small text-muted mb-2">Temukan file yang dibuat atau diubah dalam N hari terakhir. Berguna mendeteksi upload backdoor setelah infeksi.</p>
+            <span class="badge bg-light text-dark border">Filter PHP</span> <span class="badge bg-light text-dark border">Configurable</span>
+          </div></div>
+        </div>
+        <div class="col-md-6 col-xl-4">
+          <div class="card feature-tile"><div class="card-body">
+            <div class="ft-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-hdd-network"></i></div>
+            <h6 class="fw-semibold">Scan Sistem (rkhunter)</h6>
+            <p class="small text-muted mb-2">Rootkit Hunter — periksa level OS: rootkit, backdoor kernel, binary sistem berubah, file tersembunyi, port mencurigakan.</p>
+            <span class="badge bg-light text-dark border">Seluruh server</span> <span class="badge bg-success-subtle text-success border">Cron 03:00</span>
+          </div></div>
+        </div>
+        <div class="col-md-6 col-xl-4">
+          <div class="card feature-tile"><div class="card-body">
+            <div class="ft-icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-archive"></i></div>
+            <h6 class="fw-semibold">Karantina File</h6>
+            <p class="small text-muted mb-2">Isolasi file berbahaya ke gudang aman. File tidak bisa diakses web. Bisa dipulihkan atau dihapus permanen dari panel.</p>
+            <span class="badge bg-light text-dark border">Restore</span> <span class="badge bg-light text-dark border">Hapus permanen</span>
+          </div></div>
+        </div>
+        <div class="col-md-6 col-xl-4">
+          <div class="card feature-tile"><div class="card-body">
+            <div class="ft-icon bg-success bg-opacity-10 text-success"><i class="bi bi-check-circle"></i></div>
+            <h6 class="fw-semibold">Whitelist File</h6>
+            <p class="small text-muted mb-2">Tandai file sah agar tidak diflag atau dikarantina. Berguna untuk <code>installer.php</code> Duplicator saat restore.</p>
+            <span class="badge bg-light text-dark border">ON/OFF toggle</span> <span class="badge bg-light text-dark border">Per-file</span>
+          </div></div>
+        </div>
+        <div class="col-md-6 col-xl-4">
+          <div class="card feature-tile"><div class="card-body">
+            <div class="ft-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-wordpress"></i></div>
+            <h6 class="fw-semibold">Audit User WordPress</h6>
+            <p class="small text-muted mb-2">Daftar semua user WP per domain. Deteksi admin mencurigakan, backdoor account, admin baru. Tombol Nonaktifkan &amp; Karantina langsung.</p>
+            <span class="badge bg-light text-dark border">Dashboard</span> <span class="badge bg-danger-subtle text-danger border">Auto-flag</span>
+          </div></div>
+        </div>
+        <div class="col-md-6 col-xl-4">
+          <div class="card feature-tile"><div class="card-body">
+            <div class="ft-icon bg-dark bg-opacity-10 text-dark"><i class="bi bi-speedometer2"></i></div>
+            <h6 class="fw-semibold">Dashboard Real-time</h6>
+            <p class="small text-muted mb-2">Ringkasan status server: RAM, disk, load, jumlah temuan, job berjalan, user WP mencurigakan. Auto-refresh setiap 15 detik.</p>
+            <span class="badge bg-light text-dark border">Live status</span> <span class="badge bg-light text-dark border">16 domain</span>
+          </div></div>
+        </div>
+        <div class="col-md-6 col-xl-4">
+          <div class="card feature-tile"><div class="card-body">
+            <div class="ft-icon bg-info bg-opacity-10 text-info"><i class="bi bi-clock-history"></i></div>
+            <h6 class="fw-semibold">Background Jobs</h6>
+            <p class="small text-muted mb-2">Semua scan berjalan di background. Panel tetap responsif. Lihat log real-time, status selesai/gagal, dan riwayat job.</p>
+            <span class="badge bg-light text-dark border">Non-blocking</span> <span class="badge bg-light text-dark border">Log viewer</span>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-lg-7">
+          <h6 class="fw-semibold mb-3"><i class="bi bi-clock-history text-primary me-2"></i>Riwayat Update</h6>
+          <div class="timeline">
+            <div class="tl-item">
+              <div class="tl-dot bg-primary"></div>
+              <div class="card tl-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <span class="fw-semibold">v4.2 — WordPress Audit + Cron</span>
+                  <span class="badge bg-primary">6 Jul 2026</span>
+                </div>
+                <div class="card-body small">
+                  <ul class="mb-0">
+                    <li>Audit user WordPress di Dashboard (deteksi admin mencurigakan)</li>
+                    <li>Tombol <b>Nonaktifkan</b> &amp; <b>Karantina</b> user WP langsung dari panel</li>
+                    <li>Cron harian rkhunter jam 03:00 (<code>/etc/cron.d/scanpanel-rkhunter</code>)</li>
+                    <li>Halaman Updates Note (halaman ini)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-dot bg-info"></div>
+              <div class="card tl-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <span class="fw-semibold">v4.1 — Scan Sistem (rkhunter)</span>
+                  <span class="badge bg-info text-dark">6 Jul 2026</span>
+                </div>
+                <div class="card-body small">
+                  <ul class="mb-0">
+                    <li>Integrasi Rootkit Hunter 1.4.6 untuk scan level OS</li>
+                    <li>Menu <b>Scan Sistem</b> + parser warning otomatis</li>
+                    <li>Filter false-positive OpenLiteSpeed (<code>/dev/shm/ols</code>, lsmcd)</li>
+                    <li>Klasifikasi severity: tinggi / sedang / rendah</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-dot bg-success"></div>
+              <div class="card tl-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <span class="fw-semibold">v4.0 — UI Bootstrap Light Mode</span>
+                  <span class="badge bg-success">6 Jul 2026</span>
+                </div>
+                <div class="card-body small">
+                  <ul class="mb-0">
+                    <li>Redesign UI: Bootstrap 5, sidebar kiri, light mode</li>
+                    <li>SweetAlert2 untuk konfirmasi &amp; notifikasi toast</li>
+                    <li>DataTables di semua tabel temuan (sort, search, paginate)</li>
+                    <li>Tombol berlabel jelas: Karantina, Whitelist, Nonaktifkan</li>
+                    <li>Placeholder kosong per tab + petunjuk singkat</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-dot bg-warning"></div>
+              <div class="card tl-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <span class="fw-semibold">v3.0 — Per-Domain + Karantina</span>
+                  <span class="badge bg-warning text-dark">5-6 Jul 2026</span>
+                </div>
+                <div class="card-body small">
+                  <ul class="mb-0">
+                    <li>Scan per-domain (16 domain), bukan semua sekaligus</li>
+                    <li>Karantina file + restore + hapus permanen</li>
+                    <li>Whitelist ON/OFF per file</li>
+                    <li>Background jobs non-blocking + log viewer</li>
+                    <li>API lengkap: status, domains, findings, jobs, quarantine, whitelist</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-dot bg-secondary"></div>
+              <div class="card tl-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <span class="fw-semibold">v1.0 — Panel Awal</span>
+                  <span class="badge bg-secondary">5 Jul 2026</span>
+                </div>
+                <div class="card-body small">
+                  <ul class="mb-0">
+                    <li>Install ClamAV + maldet di server Ubuntu 20.04</li>
+                    <li>Panel HTTPS port 9793 dengan Basic Auth</li>
+                    <li>Scan Anti-Backdoor heuristik + Scan Malware</li>
+                    <li>Deteksi infeksi di a-listfilm.com (webshell, plugin palsu, admin rogue)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-5">
+          <h6 class="fw-semibold mb-3"><i class="bi bi-tools text-primary me-2"></i>Teknologi</h6>
+          <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+            <div class="d-flex flex-wrap gap-1 mb-3">
+              <span class="tech-badge"><i class="bi bi-shield text-primary"></i> ClamAV 0.103</span>
+              <span class="tech-badge"><i class="bi bi-bug text-warning"></i> maldet 1.6.6</span>
+              <span class="tech-badge"><i class="bi bi-hdd-network text-info"></i> rkhunter 1.4.6</span>
+              <span class="tech-badge"><i class="bi bi-bootstrap text-primary"></i> Bootstrap 5.3</span>
+              <span class="tech-badge"><i class="bi bi-table text-success"></i> DataTables</span>
+              <span class="tech-badge"><i class="bi bi-bell text-warning"></i> SweetAlert2</span>
+              <span class="tech-badge"><i class="bi bi-code-slash text-dark"></i> Python 3</span>
+              <span class="tech-badge"><i class="bi bi-lock text-danger"></i> HTTPS + TLS</span>
+            </div>
+            <hr>
+            <h6 class="fw-semibold small mb-2">Server</h6>
+            <table class="table table-sm small mb-0">
+              <tr><td class="text-muted">OS</td><td>Ubuntu 20.04 LTS</td></tr>
+              <tr><td class="text-muted">Panel</td><td>CyberPanel 2.3</td></tr>
+              <tr><td class="text-muted">Web Server</td><td>OpenLiteSpeed</td></tr>
+              <tr><td class="text-muted">PHP</td><td>lsphp83</td></tr>
+              <tr><td class="text-muted">Port Panel</td><td><code>9793</code> (HTTPS)</td></tr>
+              <tr><td class="text-muted">Service</td><td><code>scanpanel</code> (systemd)</td></tr>
+              <tr><td class="text-muted">Path</td><td><code>/usr/local/maldetect-panel/</code></td></tr>
+            </table>
+          </div></div>
+
+          <h6 class="fw-semibold mb-3"><i class="bi bi-list-check text-primary me-2"></i>Alur Kerja Disarankan</h6>
+          <div class="card border-0 shadow-sm"><div class="card-body small">
+            <ol class="mb-0 ps-3">
+              <li class="mb-2">Pilih <b>domain</b> di kanan atas</li>
+              <li class="mb-2">Jalankan <b>Scan Anti-Backdoor</b> + <b>Scan Malware</b></li>
+              <li class="mb-2">Cek <b>Temuan Virus</b> → karantina file berbahaya</li>
+              <li class="mb-2">Cek <b>User WordPress</b> di Dashboard → karantina admin rogue</li>
+              <li class="mb-2">Jalankan <b>Scan Sistem</b> (otomatis tiap malam)</li>
+              <li class="mb-0">Whitelist file sah (mis. installer.php) jika perlu</li>
+            </ol>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FILE DETAIL MODAL -->
+<div class="modal fade" id="fileDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-semibold"><i class="bi bi-file-earmark-code text-primary me-2"></i>Detail Temuan</h5>
+          <div id="fdPath" class="small text-muted path-cell mt-1"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex flex-wrap gap-2 mb-3 align-items-center" id="fdMeta"></div>
+        <ul class="nav nav-tabs mb-3" id="fdTabs">
+          <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#fdTabInfo"><i class="bi bi-info-circle me-1"></i>Info</a></li>
+          <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#fdTabCode"><i class="bi bi-code-slash me-1"></i>Source Code</a></li>
+          <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#fdTabProbe"><i class="bi bi-globe me-1"></i>Test URL</a></li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="fdTabInfo">
+            <div id="fdIndicators" class="mb-3"></div>
+            <div id="fdUrlBox" class="alert alert-light border small mb-0"></div>
+          </div>
+          <div class="tab-pane fade" id="fdTabCode">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span id="fdCodeMeta" class="small text-muted"></span>
+              <span class="badge bg-danger-subtle text-danger" id="fdHlBadge" style="display:none">Baris merah = pola berbahaya</span>
+            </div>
+            <div id="fdCode" class="code-view"><div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm"></div> Memuat...</div></div>
+          </div>
+          <div class="tab-pane fade" id="fdTabProbe">
+            <p class="small text-muted">Mengakses URL file via web server untuk mengecek apakah backdoor <b>aktif</b> (bisa dieksekusi) atau hanya ada di disk.</p>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              <button class="btn btn-primary btn-sm" id="fdProbeBtn" onclick="probeFileUrl()"><i class="bi bi-play-fill me-1"></i>Test URL Sekarang</button>
+              <a id="fdUrlOpen" href="#" target="_blank" class="btn btn-outline-secondary btn-sm d-none"><i class="bi bi-box-arrow-up-right me-1"></i>Buka di Tab Baru</a>
+            </div>
+            <div id="fdProbeResult"></div>
+            <pre id="fdProbeBody" class="logbox d-none mt-2 small"></pre>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span id="fdActions" class="me-auto"></span>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+var DOMAIN='ALL',FIND=null,curJob=null,jobTimer=null,WPUSERS=null,FD_PATH='',fdModal=null;
+var dtLang={search:'Cari:',lengthMenu:'Tampilkan _MENU_ data',info:'_START_-_END_ dari _TOTAL_',paginate:{previous:'&laquo;',next:'&raquo;'},emptyTable:'Tidak ada data',zeroRecords:'Tidak ditemukan'};
+var titles={dash:'Dashboard',scan:'Scan',findings:'Temuan Virus',system:'Scan Sistem',quar:'Karantina',whitelist:'Whitelist',jobs:'Riwayat Job',docs:'Bantuan',updates:'Updates'};
+var dts={},jobsBusy=false;
+
+function api(p,o){return fetch(p,Object.assign({credentials:'same-origin'},o||{})).then(r=>r.json())}
+function esc(s){return $('<div>').text(s==null?'':s).html()}
+function enc(s){return encodeURIComponent(s)}
+function ago(ts){var s=Math.floor(Date.now()/1000-ts);if(s<60)return s+' dtk';if(s<3600)return Math.floor(s/60)+' mnt';if(s<86400)return Math.floor(s/3600)+' jam';return Math.floor(s/86400)+' hr'}
+function scoreCls(s){return s>=12?'score-hi':(s>=8?'score-mid':'score-lo')}
+function toastOk(m){Swal.fire({toast:true,position:'top-end',icon:'success',title:m,showConfirmButton:false,timer:2500})}
+function toastErr(m){Swal.fire({toast:true,position:'top-end',icon:'error',title:m,showConfirmButton:false,timer:3500})}
+function confirmAct(title,text){return Swal.fire({title:title,text:text,icon:'question',showCancelButton:true,confirmButtonText:'Ya',cancelButtonText:'Batal',confirmButtonColor:'#dc3545'})}
+
+function btnDetail(p){return '<button class="btn btn-outline-primary btn-sm btn-act me-1" onclick="openFileDetail(\''+p+'\')"><i class="bi bi-search me-1"></i>Detail</button>'}
+function fileLink(path,enc,extra){return '<a href="#" class="path-cell text-primary path-link" onclick="openFileDetail(\''+enc+'\');return false"><i class="bi bi-file-earmark-code me-1"></i>'+esc(path)+'</a>'+(extra||'')}
+function btnKarantina(p){return '<button class="btn btn-danger btn-sm btn-act me-1" onclick="qAdd(\''+p+'\')"><i class="bi bi-archive me-1"></i>Karantina</button>'}
+function btnWhitelist(p){return '<button class="btn btn-outline-success btn-sm btn-act" onclick="wlAddPath(\''+p+'\')"><i class="bi bi-shield-check me-1"></i>Whitelist</button>'}
+function btnCabutWl(p){return '<button class="btn btn-outline-secondary btn-sm btn-act" onclick="wlToggle(\''+p+'\')"><i class="bi bi-shield-x me-1"></i>Cabut Whitelist</button>'}
+function toggleEmpty(id,empty,hasRows){$('#'+empty).toggleClass('d-none',hasRows);$('#'+id).toggleClass('d-none',!hasRows)}
+
+function initDT(id,opts){
+  opts=opts||{};
+  var $t=$('#'+id),data=opts.data,base=$.extend({language:dtLang,pageLength:25,order:[]},opts);
+  delete base.data;
+  if($.fn.DataTable.isDataTable($t)){
+    var dt=$t.DataTable();
+    if(data!==undefined){
+      dt.clear();
+      if(data.length)dt.rows.add(data);
+      dt.draw(false);
+      dts[id]=dt;
+      return dt;
+    }
+    dt.destroy();
+    $t=$('#'+id);
+  }
+  if(data!==undefined)base.data=data;
+  dts[id]=$t.DataTable(base);
+  return dts[id];
+}
+
+$('.nav-link[data-page]').on('click',function(e){e.preventDefault();
+  var p=$(this).data('page');
+  $('.nav-link[data-page]').removeClass('active');$(this).addClass('active');
+  $('.page').addClass('d-none');$('#page-'+p).removeClass('d-none');
+  $('#pageTitle').text(titles[p]||p);
+  $('#sidebar').removeClass('show');
+  if(p==='findings')loadFindings();
+  if(p==='system')loadFindings();
+  if(p==='quar'||p==='whitelist')loadFindings();
+  if(p==='jobs')loadJobs();
+});
+
+$('#btnToggleSidebar').on('click',function(){$('#sidebar').toggleClass('show')});
+
+function loadDomains(){api('/api/domains').then(function(d){
+  var o='<option value="ALL">— Semua domain —</option>';
+  (d.domains||[]).forEach(function(x){o+='<option value="'+esc(x.path)+'">'+esc(x.name)+'</option>'});
+  $('#domainsel').html(o);
+  var def=(d.domains||[]).find(function(x){return x.name==='a-listfilm.com'});
+  if(def){$('#domainsel').val(def.path);DOMAIN=def.path}
+  loadWpUsers();
+})}
+function onDomainChange(){DOMAIN=$('#domainsel').val();toastOk('Domain: '+(DOMAIN==='ALL'?'semua':DOMAIN.split('/')[2]));loadWpUsers()}
+
+function statusBadge(s){var m={berjalan:'warning',selesai:'success',gagal:'danger',terhenti:'secondary'};
+  return '<span class="badge bg-'+(m[s]||'secondary')+'">'+esc(s)+'</span>'}
+
+function wpRiskBadge(r){var m={tinggi:'danger',sedang:'warning',aman:'success'};
+  return '<span class="badge bg-'+(m[r]||'secondary')+'">'+esc(r)+'</span>'}
+
+function loadWpUsers(){
+  var dom=DOMAIN;
+  if(dom==='ALL'){
+    $('#wpmeta').text('');
+    $('#wp-empty-msg').text('Pilih domain WordPress di kanan atas (bukan "Semua domain").');
+    toggleEmpty('wp-table-wrap','wp-empty',false);
+    initDT('tblWpUsers',{data:[],columnDefs:[{targets:-1,orderable:false}]});
+    return;
+  }
+  api('/api/wpusers?domain='+enc(dom)).then(function(d){
+    if(d.error){
+      $('#wpmeta').text('');
+      $('#wp-empty-msg').text(d.error);
+      toggleEmpty('wp-table-wrap','wp-empty',false);
+      initDT('tblWpUsers',{data:[],columnDefs:[{targets:-1,orderable:false}]});
+      return;
+    }
+    WPUSERS=d;
+    $('#wpmeta').text(d.domain+' — '+d.total+' user, '+d.admins+' admin, '+d.suspicious+' mencurigakan');
+    var rows=(d.users||[]).map(function(u){
+      var note=(u.reasons&&u.reasons.length)?u.reasons.join('; '):'-';
+      var rowCls=u.risk!=='aman'?'table-warning':'';
+      var act='';
+      if(u.quarantined)act='<span class="badge bg-secondary">Dikarantina</span>';
+      else if(u.role==='administrator'||u.risk!=='aman'){
+        act='<button class="btn btn-warning btn-sm btn-act me-1" onclick="wpDeactivate('+u.id+')"><i class="bi bi-person-x me-1"></i>Nonaktifkan</button>'
+          +'<button class="btn btn-danger btn-sm btn-act" onclick="wpQuarantine('+u.id+')"><i class="bi bi-shield-x me-1"></i>Karantina</button>';
+      }else act='<span class="text-muted small">-</span>';
+      return {rowCls:rowCls,cells:[
+        wpRiskBadge(u.risk),
+        '<span class="fw-semibold">'+esc(u.login)+'</span>',
+        esc(u.email),
+        '<span class="badge bg-'+(u.role==='administrator'?'primary':'secondary')+'">'+esc(u.role)+'</span>',
+        esc(u.registered),
+        '<small class="text-muted">'+esc(note)+'</small>',
+        act
+      ]};
+    });
+    toggleEmpty('wp-table-wrap','wp-empty',rows.length>0);
+    var data=rows.map(function(r){return r.cells});
+    initDT('tblWpUsers',{data:data,order:[[0,'desc']],columnDefs:[{targets:-1,orderable:false}],
+      createdRow:function(row,data,idx){if(rows[idx]&&rows[idx].rowCls)$(row).addClass(rows[idx].rowCls)}});
+    if(d.suspicious>0)toastErr(d.suspicious+' user WordPress mencurigakan!');
+  });
+}
+
+function wpUserName(id){var u=(WPUSERS&&WPUSERS.users||[]).find(function(x){return x.id===id});return u?u.login:'#'+id}
+
+function wpDeactivate(id){var login=wpUserName(id);confirmAct('Nonaktifkan user "'+login+'"?','Role akan diturunkan ke subscriber (tidak bisa akses admin).').then(function(r){
+  if(!r.isConfirmed)return;
+  api('/api/wpuser/deactivate?domain='+enc(DOMAIN)+'&id='+id,{method:'POST'}).then(function(d){
+    if(d.error)toastErr(d.error);else toastOk('User '+login+' dinonaktifkan.');loadWpUsers();
+  });
+})}
+function wpQuarantine(id){var login=wpUserName(id);confirmAct('Karantina user "'+login+'"?','Password dikunci & role diturunkan. User tidak bisa login.').then(function(r){
+  if(!r.isConfirmed)return;
+  api('/api/wpuser/quarantine?domain='+enc(DOMAIN)+'&id='+id,{method:'POST'}).then(function(d){
+    if(d.error)toastErr(d.error);else toastOk('User '+login+' dikarantina.');loadWpUsers();
+  });
+})}
+
+function loadStatus(){api('/api/status').then(function(d){
+  var mal=d.malware||{},mn=(mal.hits||[]).length;
+  var cards=[
+    {t:'Status Scan',v:d.scan_running==='YES'?'<span class="text-warning">Scanning...</span>':'<span class="text-success">Idle</span>',i:'bi-activity',c:'primary'},
+    {t:'Malware',v:mn,v2:mn>0?'text-danger':'text-success',i:'bi-virus',c:'danger'},
+    {t:'Backdoor',v:d.backdoor_flagged==null?'-':d.backdoor_flagged,v2:(d.backdoor_flagged>0?'text-danger':'text-success'),i:'bi-code-slash',c:'warning'},
+    {t:'Rootkit',v:d.rkhunter_warnings==null?'-':d.rkhunter_warnings,v2:(d.rkhunter_warnings>0?'text-danger':'text-success'),i:'bi-hdd-network',c:'primary',sub:d.rkhunter_when?d.rkhunter_when.substring(0,10):'belum'},
+    {t:'AIDE',v:d.aide_clean===true?'Bersih':(d.aide_changes==null?'-':d.aide_changes),v2:(d.aide_changes>0?'text-danger':'text-success'),i:'bi-fingerprint',c:'success',sub:d.aide_baseline==='YES'?'baseline OK':'belum baseline'},
+    {t:'Lynis',v:d.lynis_score==null?'-':d.lynis_score+'/100',v2:(d.lynis_score>=70?'text-success':(d.lynis_score>=50?'text-warning':'text-danger')),i:'bi-clipboard-check',c:'info',sub:(d.lynis_warnings||0)+' warning'},
+    {t:'Karantina',v:d.quarantined,i:'bi-archive',c:'info'},
+    {t:'Whitelist',v:d.whitelisted,i:'bi-check-circle',c:'success'},
+    {t:'File Baru',v:d.newfiles_found==null?'-':d.newfiles_found,i:'bi-file-earmark',c:'secondary'},
+    {t:'ClamAV',v:esc(d.clamav_version),i:'bi-shield',c:'primary',sub:esc(d.clamdb).substring(0,40)},
+    {t:'Memory',v:esc(d.mem),i:'bi-memory',c:'secondary',sub:esc(d.load)}
+  ];
+  var html='';
+  cards.forEach(function(c){
+    html+='<div class="col-6 col-md-4 col-xl-3"><div class="card stat-card h-100"><div class="card-body d-flex gap-3">';
+    html+='<div class="icon bg-'+c.c+' bg-opacity-10 text-'+c.c+'"><i class="bi '+c.i+'"></i></div>';
+    html+='<div><div class="small text-muted">'+c.t+'</div><div class="fs-5 fw-bold '+(c.v2||'')+'">'+c.v+'</div>';
+    if(c.sub)html+='<div class="small text-muted">'+c.sub+'</div>';
+    html+='</div></div></div></div>';
+  });
+  $('#statuscards').html(html);
+})}
+
+function refreshRunningJobs(){api('/api/jobs').then(function(d){
+  var run=(d.jobs||[]).filter(function(j){return j.status==='berjalan'});
+  $('#runningjobs').html(run.length?run.map(function(j){
+    return '<div class="alert alert-warning py-2 mb-2 small cursor-pointer" onclick="openJob(\''+j.id+'\')">'+statusBadge(j.status)+' <b>'+esc(j.title)+'</b> — '+esc(j.last)+'</div>';
+  }).join(''):'<span class="text-muted">Tidak ada job berjalan.</span>');
+})}
+
+function loadJobs(){if(jobsBusy)return;jobsBusy=true;
+  api('/api/jobs').then(function(d){
+    var rows=(d.jobs||[]).map(function(j){
+      return [statusBadge(j.status)+(j.exit?' <small class="text-muted">('+j.exit+')</small>':''),
+        esc(j.title),ago(j.started),esc(j.last),
+        '<button class="btn btn-outline-primary btn-sm" onclick="openJob(\''+j.id+'\')"><i class="bi bi-eye"></i></button>'];
+    });
+    initDT('tblJobs',{data:rows,columnDefs:[{targets:-1,orderable:false}]});
+    var run=(d.jobs||[]).filter(function(j){return j.status==='berjalan'});
+    $('#runningjobs').html(run.length?run.map(function(j){
+      return '<div class="alert alert-warning py-2 mb-2 small cursor-pointer" onclick="openJob(\''+j.id+'\')">'+statusBadge(j.status)+' <b>'+esc(j.title)+'</b> — '+esc(j.last)+'</div>';
+    }).join(''):'<span class="text-muted">Tidak ada job berjalan.</span>');
+  }).finally(function(){jobsBusy=false});
+}
+
+function openJob(id){curJob=id;
+  $('.nav-link[data-page]').removeClass('active');$('.nav-link[data-page=jobs]').addClass('active');
+  $('.page').addClass('d-none');$('#page-jobs').removeClass('d-none');
+  $('#joblogwrap').removeClass('d-none');refreshJobLog();
+  if(jobTimer)clearInterval(jobTimer);jobTimer=setInterval(refreshJobLog,2500);
+}
+function refreshJobLog(){if(!curJob)return;api('/api/job?id='+curJob).then(function(d){
+  if(!d||!d.meta)return;
+  $('#joblogtitle').html(esc(d.meta.title)+' '+statusBadge(d.status));
+  $('#joblog').text(d.log||'(belum ada output)');
+  if(d.status!=='berjalan'&&jobTimer){clearInterval(jobTimer);jobTimer=null;loadStatus()}
+})}
+
+function runAction(kind,extra){var dm=kind==='updatedb'?'':'&domain='+enc(DOMAIN);
+  api('/api/run/'+kind+'?x=1'+dm+extra,{method:'POST'}).then(function(d){
+    if(d.error){toastErr(d.error);return}
+    toastOk('Job dimulai: '+d.title);openJob(d.id);loadJobs();
+  });
+}
+
+function loadFindings(){api('/api/findings').then(function(d){FIND=d;renderFindings()})}
+
+function renderFindings(){
+  if(!FIND)return;
+  var bd=FIND.backdoor,mal=FIND.malware||{},nf=FIND.newfiles;
+  var min=parseInt($('#minscore').val()),hide=$('#hidewl').is(':checked');
+
+  if(bd)$('#findmeta').text('Scan: '+(bd.generated||'-')+' | '+(bd.scanned_files||0)+' file');
+  var bitems=(bd&&bd.items)?bd.items.filter(function(it){return it.score>=min&&!(hide&&it.whitelisted)}):[];
+  $('#bd-count').text(bitems.length);
+  var bdrows=bitems.map(function(it){
+    var chips=it.indicators.slice(0,4).map(function(x){
+      var dg=/eval|exec|system|shell|KOMBO|webshell/i.test(x.label);
+      return '<span class="chip'+(dg?' danger':'')+'">'+esc(x.label.split(' - ')[0])+'</span>';
+    }).join('');
+    var stx=it.whitelisted?'<span class="badge bg-success">WL</span>':(it.quarantined?(it.recreated?'<span class="badge bg-danger">MUNCUL LAGI!</span>':'<span class="badge bg-warning">Q</span>'):'');
+    var act='';
+    if(it.recreated)act='<button class="btn btn-danger btn-sm btn-act me-1" onclick="qSweepOne(\''+enc(it.path)+'\')"><i class="bi bi-shield-x me-1"></i>Hapus Lagi</button>'+btnDetail(enc(it.path));
+    else if(it.quarantined)act='<span class="text-muted small"><i class="bi bi-archive me-1"></i>Sudah dikarantina</span>';
+    else if(it.whitelisted)act=btnCabutWl(enc(it.path));
+    else act=btnDetail(enc(it.path))+btnKarantina(enc(it.path))+btnWhitelist(enc(it.path));
+    var ep=enc(it.path);
+    return ['<span class="score-badge '+scoreCls(it.score)+'">'+it.score+'</span>',
+      fileLink(it.path,ep,' '+stx)+'<br><small class="text-muted">'+esc(it.snippet||'').substring(0,100)+'</small>',
+      chips,esc(it.owner),esc(it.mtime),act];
+  });
+  initDT('tblBackdoor',{data:bdrows,order:[[0,'desc']],columnDefs:[{targets:-1,orderable:false}]});
+  toggleEmpty('bd-table-wrap','bd-empty',bitems.length>0);
+
+  var mh=mal.hits||[];$('#mal-count').text(mh.length);
+  $('#malsummary').text(mal.summary||'Belum ada scan malware.');
+  var malrows=mh.map(function(h){
+    var ep=enc(h.path);
+    return [esc(h.sig),fileLink(h.path,ep,''),
+      btnDetail(ep)+btnKarantina(ep)+btnWhitelist(ep)];
+  });
+  initDT('tblMalware',{data:malrows,columnDefs:[{targets:-1,orderable:false}]});
+  toggleEmpty('mal-table-wrap','mal-empty',mh.length>0);
+
+  var nfitems=(nf&&nf.items)?nf.items:[];
+  $('#nf-count').text(nfitems.length);
+  var nfrows=nfitems.map(function(it){
+    var ep=enc(it.path);
+    var php=it.is_php?'<span class="badge bg-warning text-dark me-1">PHP</span>':'';
+    return [esc(it.mtime),php+fileLink(it.path,ep,''),it.size,esc(it.owner),
+      btnDetail(ep)];
+  });
+  initDT('tblNewfiles',{data:nfrows,order:[[0,'desc']],columnDefs:[{targets:-1,orderable:false}]});
+  toggleEmpty('nf-table-wrap','nf-empty',nfitems.length>0);
+
+  var qm=FIND.quarantine||[];
+  var qrec={};
+  (FIND.quarantine_recreated||[]).forEach(function(e){qrec[e.orig]=e});
+  if(Object.keys(qrec).length){
+    $('#quarAlert').removeClass('d-none');
+    $('#quarAlertMsg').text(Object.keys(qrec).length+' file muncul lagi setelah dikarantina!');
+  }else{$('#quarAlert').addClass('d-none')}
+  var qrows=qm.map(function(e){
+    var back=qrec[e.orig];
+    var st=back?'<span class="badge bg-danger">MUNCUL LAGI</span>':'<span class="badge bg-success">Aman</span>';
+    return [esc(e.at),'<span class="path-cell">'+esc(e.orig)+'</span>',st,esc(e.reason||'-'),
+      (back?'<button class="btn btn-danger btn-sm btn-act me-1" onclick="qSweepOne(\''+enc(e.orig)+'\')"><i class="bi bi-trash me-1"></i>Hapus Lagi</button>':'')+
+      '<button class="btn btn-success btn-sm btn-act me-1" onclick="qRestore(\''+esc(e.id)+'\')"><i class="bi bi-arrow-counterclockwise me-1"></i>Pulihkan</button><button class="btn btn-outline-danger btn-sm btn-act" onclick="qDelete(\''+esc(e.id)+'\')"><i class="bi bi-trash me-1"></i>Hapus</button>'];
+  });
+  initDT('tblQuar',{data:qrows,order:[[0,'desc']]});
+
+  var wl=FIND.whitelist||[];
+  var wlrows=wl.map(function(e){
+    return ['<div class="form-check form-switch"><input class="form-check-input" type="checkbox" '+(e.enabled?'checked':'')+' onchange="wlToggle(\''+enc(e.path)+'\')"><label class="form-check-label small">'+(e.enabled?'ON':'OFF')+'</label></div>',
+      '<span class="path-cell">'+esc(e.path)+'</span>',esc(e.added||''),
+      '<button class="btn btn-outline-danger btn-sm btn-act" onclick="wlRemove(\''+enc(e.path)+'\')"><i class="bi bi-trash me-1"></i>Hapus</button>'];
+  });
+  initDT('tblWl',{data:wlrows});
+
+  renderRk();renderAide();renderLynis();
+}
+
+function rkSevBadge(s){var m={tinggi:'danger',sedang:'warning',rendah:'secondary'};
+  return '<span class="badge bg-'+(m[s]||'secondary')+'">'+esc(s)+'</span>'}
+
+function renderRk(){
+  var rk=FIND.rkhunter;
+  var hide=$('#rkhidebenign').is(':checked');
+  if(!rk){
+    $('#rk-real,#rk-high,#rk-benign').text('-');$('#rk-when').text('-');$('#rk-tab-count').text('0');
+    toggleEmpty('rk-table-wrap','rk-empty',false);
+    initDT('tblRk',{data:[]});
+    return;
+  }
+  $('#rk-real').text(rk.real_warnings);
+  $('#rk-high').text(rk.high);
+  $('#rk-benign').text(rk.benign_warnings);
+  $('#rk-when').text(rk.generated||'-');
+  $('#rk-tab-count').text(rk.real_warnings||0);
+  var order={tinggi:3,sedang:2,rendah:1};
+  var items=(rk.items||[]).filter(function(it){return !(hide&&it.benign)});
+  items.sort(function(a,b){return (order[b.severity]||0)-(order[a.severity]||0)});
+  var rows=items.map(function(it){
+    return [rkSevBadge(it.severity),
+      '<span class="path-cell">'+esc(it.title)+'</span>',
+      '<small class="text-muted">'+esc(it.detail||'-')+'</small>',
+      it.benign?'<span class="badge bg-secondary">aman</span>':'<span class="badge bg-danger-subtle text-danger">tinjau</span>'];
+  });
+  toggleEmpty('rk-table-wrap','rk-empty',rows.length>0);
+  initDT('tblRk',{data:rows,order:[[0,'desc']]});
+}
+
+function renderAide(){
+  var aid=FIND.aide;
+  var hide=$('#aidehidebenign').is(':checked');
+  if(!aid){
+    $('#aide-real,#aide-high,#aide-when').text('-');$('#aide-status').text('-');$('#aide-tab-count').text('0');
+    toggleEmpty('aide-table-wrap','aide-empty',false);
+    initDT('tblAide',{data:[]});
+    return;
+  }
+  $('#aide-real').text(aid.real_changes);
+  $('#aide-high').text(aid.high);
+  $('#aide-when').text(aid.generated||'-');
+  $('#aide-status').html(aid.clean?'<span class="text-success fw-semibold">Bersih</span>':'<span class="text-danger fw-semibold">Ada perubahan</span>');
+  $('#aide-tab-count').text(aid.real_changes||0);
+  var order={tinggi:3,sedang:2,rendah:1};
+  var items=(aid.items||[]).filter(function(it){return !(hide&&it.benign)});
+  items.sort(function(a,b){return (order[b.severity]||0)-(order[a.severity]||0)});
+  var rows=items.map(function(it){
+    var ep=enc(it.path);
+    var fl=it.path.indexOf('/home/')>=0?fileLink(it.path,ep,''):'<span class="path-cell">'+esc(it.path)+'</span>';
+    return [rkSevBadge(it.severity),
+      '<span class="badge bg-light text-dark border">'+esc(it.change)+'</span>',
+      fl,
+      it.benign?'<span class="badge bg-secondary">log/tmp</span>':'<span class="badge bg-danger-subtle text-danger">tinjau</span>'];
+  });
+  toggleEmpty('aide-table-wrap','aide-empty',rows.length>0||aid.clean);
+  if(aid.clean&&rows.length===0){$('#aide-empty').removeClass('d-none').find('p').html('Tidak ada perubahan file — sistem bersih menurut baseline AIDE.');$('#aide-table-wrap').addClass('d-none')}
+  initDT('tblAide',{data:rows,order:[[0,'desc']]});
+}
+
+function renderLynis(){
+  var lyn=FIND.lynis;
+  if(!lyn){
+    $('#lyn-score,#lyn-warn,#lyn-sug,#lyn-when').text('-');$('#lyn-tab-count').text('0');
+    toggleEmpty('lyn-table-wrap','lyn-empty',false);
+    initDT('tblLynis',{data:[]});
+    return;
+  }
+  $('#lyn-score').text(lyn.hardening_score!=null?lyn.hardening_score:'?');
+  $('#lyn-warn').text(lyn.warnings);
+  $('#lyn-sug').text(lyn.suggestions);
+  $('#lyn-when').text(lyn.generated||'-');
+  $('#lyn-tab-count').text(lyn.warnings||0);
+  var order={tinggi:3,sedang:2,rendah:1};
+  var items=(lyn.items||[]).slice();
+  items.sort(function(a,b){return (order[b.severity]||0)-(order[a.severity]||0)});
+  var rows=items.map(function(it){
+    return [rkSevBadge(it.severity),
+      '<span class="badge bg-'+(it.type==='warning'?'warning text-dark':'secondary')+'">'+esc(it.type)+'</span>',
+      esc(it.text)];
+  });
+  toggleEmpty('lyn-table-wrap','lyn-empty',rows.length>0);
+  initDT('tblLynis',{data:rows,order:[[0,'desc']]});
+}
+
+function openFileDetail(encPath){
+  FD_PATH=encPath;
+  if(!fdModal)fdModal=new bootstrap.Modal('#fileDetailModal');
+  $('#fdPath').text('Memuat...');
+  $('#fdMeta,#fdIndicators,#fdUrlBox,#fdProbeResult').html('');
+  $('#fdCode').html('<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-light"></div></div>');
+  $('#fdProbeBody').addClass('d-none').text('');
+  $('#fdUrlOpen').addClass('d-none').attr('href','#');
+  $('#fdActions').html('');
+  $('#fdTabInfo').addClass('show active');$('#fdTabCode,#fdTabProbe').removeClass('show active');
+  $('#fdTabs .nav-link').first().addClass('active').siblings().removeClass('active');
+  fdModal.show();
+  api('/api/file/detail?path='+encPath).then(function(d){
+    if(d.error){$('#fdPath').text(d.error);toastErr(d.error);return}
+    FD_PATH=enc(d.path);
+    $('#fdPath').text(d.path);
+    var meta='<span class="badge bg-light text-dark border">'+esc(d.size_human)+'</span>';
+    meta+='<span class="badge bg-light text-dark border">'+esc(d.owner)+'</span>';
+    meta+='<span class="badge bg-light text-dark border">'+esc(d.mtime)+'</span>';
+    if(d.score!=null)meta+='<span class="badge bg-'+(d.score>=12?'danger':(d.score>=8?'warning text-dark':'secondary'))+'">Skor '+d.score+'</span>';
+    if(d.malware_sig)meta+='<span class="badge bg-warning text-dark">'+esc(d.malware_sig)+'</span>';
+    $('#fdMeta').html(meta);
+    if(d.indicators&&d.indicators.length){
+      var ind=d.indicators.map(function(x){
+        var dg=/eval|exec|system|shell|KOMBO|webshell/i.test(x.label);
+        return '<span class="chip'+(dg?' danger':'')+'">'+esc(x.label)+(x.count>1?' ('+x.count+'x)':'')+'</span>';
+      }).join(' ');
+      $('#fdIndicators').html('<h6 class="small fw-semibold mb-2">Indikasi terdeteksi</h6><div>'+ind+'</div>');
+    }else{$('#fdIndicators').html('')}
+    if(d.url){
+      $('#fdUrlBox').html('<i class="bi bi-link-45deg me-1"></i><b>URL Web:</b> <a href="'+d.url+'" target="_blank" class="text-break">'+esc(d.url)+'</a><br><small class="text-muted">Klik tab <b>Test URL</b> untuk cek apakah backdoor aktif saat diakses via browser.</small>');
+      $('#fdUrlOpen').removeClass('d-none').attr('href',d.url);
+    }else{
+      $('#fdUrlBox').html('<i class="bi bi-info-circle me-1"></i>File ini tidak punya URL web (bukan di <code>public_html</code>). Hanya bisa inspeksi source code.');
+      $('#fdProbeBtn').prop('disabled',true);
+    }
+    var codeHtml='';
+    (d.lines||[]).forEach(function(ln){
+      codeHtml+='<div class="code-line'+(ln.hl?' hl':'')+'"><span class="code-ln">'+ln.n+'</span><span class="code-txt">'+esc(ln.text)+'</span></div>';
+    });
+    $('#fdCode').html(codeHtml||'<div class="p-3 text-muted">(file kosong)</div>');
+    var cm=d.line_count+' baris';
+    if(d.truncated)cm+=' — ditampilkan sebagian (file besar)';
+    if(d.highlight_count)cm+=' · '+d.highlight_count+' baris mencurigakan (merah)';
+    $('#fdCodeMeta').text(cm);
+    $('#fdHlBadge').toggle(!!d.highlight_count);
+    if(d.snippet)$('#fdIndicators').append('<div class="mt-2 small"><b>Snippet:</b> <code>'+esc(d.snippet.substring(0,200))+'</code></div>');
+    var act=btnKarantina(FD_PATH)+btnWhitelist(FD_PATH);
+    $('#fdActions').html(act);
+    $('#fdProbeBtn').prop('disabled',!d.url);
+  });
+}
+
+function probeFileUrl(){
+  if(!FD_PATH)return;
+  $('#fdProbeBtn').prop('disabled',true).html('<span class="spinner-border spinner-border-sm"></span> Testing...');
+  $('#fdProbeResult').html('<div class="text-muted small">Mengakses URL via server...</div>');
+  $('#fdProbeBody').addClass('d-none');
+  api('/api/file/probe?path='+FD_PATH).then(function(d){
+    $('#fdProbeBtn').prop('disabled',false).html('<i class="bi bi-play-fill me-1"></i>Test URL Sekarang');
+    if(d.error){$('#fdProbeResult').html('<div class="probe-box warning">'+esc(d.error)+'</div>');return}
+    var lv=d.verdict_level||'secondary';
+    var html='<div class="probe-box '+lv+'">';
+    html+='<div class="d-flex align-items-center gap-2 mb-2"><span class="badge bg-'+lv+' fs-6">'+esc(d.verdict_label)+'</span>';
+    html+='<span class="small">HTTP '+d.http_code+' · '+esc(d.content_type||'-')+' · '+d.size+' bytes</span></div>';
+    html+='<p class="mb-1"><b>'+esc(d.verdict_note)+'</b></p>';
+    html+='<div class="small text-muted">URL: <a href="'+d.url+'" target="_blank">'+esc(d.url)+'</a></div></div>';
+    if(d.is_dangerous)html+='<div class="alert alert-danger small mt-2 mb-0"><i class="bi bi-exclamation-triangle me-1"></i><b>Rekomendasi: segera karantina file ini!</b></div>';
+    $('#fdProbeResult').html(html);
+    if(d.body_preview){
+      $('#fdProbeBody').removeClass('d-none').text(d.body_preview);
+    }
+    if(d.is_dangerous)toastErr('Backdoor/webshell terdeteksi aktif!');
+    else if(d.verdict==='not_found'||d.verdict==='forbidden')toastOk('URL tidak bisa diakses — relatif aman via web');
+  });
+}
+
+function quarSweep(){confirmAct('Sweep karantina?','Hapus ulang semua file yang muncul lagi di path asli (sudah ada backup di gudang karantina).').then(function(r){
+  if(!r.isConfirmed)return;
+  api('/api/quarantine/sweep',{method:'POST'}).then(function(d){
+    if(d.error){toastErr(d.error);return}
+    toastOk('Sweep: '+d.count+' file dihapus ulang.');loadFindings();loadStatus();
+  });
+})}
+function qSweepOne(p){confirmAct('Hapus file yang muncul lagi?','File ini sudah ada di gudang karantina. Path asli akan dihapus.').then(function(r){
+  if(!r.isConfirmed)return;
+  api('/api/quarantine/sweep',{method:'POST'}).then(function(d){loadFindings();loadStatus();
+    if(d.removed&&d.removed.length)toastOk('File dihapus.');else toastErr('Gagal atau sudah tidak ada');
+  });
+})}
+
+function qAdd(p){confirmAct('Karantina file?','File akan dipindah ke gudang aman. Jika malware masih aktif, file bisa muncul lagi — gunakan Sweep.').then(function(r){
+  if(!r.isConfirmed)return;
+  api('/api/quarantine/add?path='+p+'&reason='+enc('dari panel'),{method:'POST'}).then(function(d){
+    if(d.error)toastErr(d.error);
+    else{if(d.warning)toastErr(d.warning);else toastOk('Dikarantina.')}
+    loadFindings();loadStatus();
+  });
+})}
+function qRestore(id){confirmAct('Pulihkan file?','File dikembalikan ke lokasi asli.').then(function(r){
+  if(!r.isConfirmed)return;
+  api('/api/quarantine/restore?id='+enc(id),{method:'POST'}).then(function(d){
+    if(d.error)toastErr(d.error);else toastOk('Dipulihkan.');loadFindings();loadStatus();
+  });
+})}
+function qDelete(id){confirmAct('Hapus permanen?','File tidak bisa dikembalikan!','warning').then(function(r){
+  if(!r.isConfirmed)return;
+  api('/api/quarantine/delete?id='+enc(id),{method:'POST'}).then(function(d){
+    if(d.error)toastErr(d.error);else toastOk('Dihapus.');loadFindings();loadStatus();
+  });
+})}
+function wlAdd(){var p=$('#wlpath').val().trim();if(!p){toastErr('Isi path dulu');return}wlAddPath(enc(p))}
+function wlAddPath(p){api('/api/whitelist/add?path='+p,{method:'POST'}).then(function(d){
+  if(d.error)toastErr(d.error);else toastOk('Ditambahkan ke whitelist.');$('#wlpath').val('');loadFindings();loadStatus();
+})}
+function wlToggle(p){api('/api/whitelist/toggle?path='+p,{method:'POST'}).then(function(d){
+  if(d.error)toastErr(d.error);else toastOk('Whitelist '+(d.enabled?'ON':'OFF'));loadFindings();loadStatus();
+})}
+function wlRemove(p){confirmAct('Hapus dari whitelist?','').then(function(r){
+  if(!r.isConfirmed)return;
+  api('/api/whitelist/remove?path='+p,{method:'POST'}).then(function(d){toastOk('Dihapus.');loadFindings();loadStatus()});
+})}
+
+loadDomains();loadStatus();refreshRunningJobs();
+setInterval(loadStatus,15000);
+setInterval(refreshRunningJobs,5000);
+setInterval(function(){if(!$('#page-jobs').hasClass('d-none'))loadJobs()},5000);
+</script>
+</body>
+</html>
