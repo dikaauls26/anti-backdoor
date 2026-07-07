@@ -8,6 +8,24 @@ LOG="/var/log/anti-backdoor-imunify.log"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
+if [[ ! -f /etc/sysconfig/imunify360/integration.conf ]]; then
+    log "Membuat integration.conf untuk standalone/CyberPanel..."
+    mkdir -p /var/www/imunifyav-ui/html/imav /etc/sysconfig/imunify360
+    cat >/etc/sysconfig/imunify360/integration.conf <<'EOF'
+[paths]
+ui_path = /var/www/imunifyav-ui/html/imav
+ui_path_owner = nobody:nogroup
+
+[pam]
+service_name = system-auth
+
+[integration_scripts]
+domains = /usr/local/maldetect-panel/imunify-get-domains.sh
+EOF
+    install -m 755 "$REPO_DIR/scripts/imunify-integration/get-domains.sh" \
+        /usr/local/maldetect-panel/imunify-get-domains.sh
+fi
+
 if command -v imunify-antivirus >/dev/null 2>&1 || command -v imunify360-agent >/dev/null 2>&1; then
     log "ImunifyAV sudah terpasang"
 else
@@ -55,7 +73,7 @@ if "$BIN" hook list --event malware-detected 2>/dev/null | grep -q malware_detec
     log "Hook malware-detected sudah terdaftar"
 else
     log "Mendaftarkan hook malware-detected..."
-    "$BIN" hook add --event malware-detected "$HOOK_DST" >>"$LOG" 2>&1 || \
+    "$BIN" hook add --event malware-detected --path "$HOOK_DST" >>"$LOG" 2>&1 || \
         log "Peringatan: gagal daftar hook (bisa manual lewat Imunify UI)"
 fi
 
