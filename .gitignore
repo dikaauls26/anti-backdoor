@@ -11,3 +11,6 @@ panel/quar_store/
 Thumbs.db
 *.swp
 *~
+
+__pycache__/
+*.pyc
