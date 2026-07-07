@@ -84,29 +84,72 @@ for f in panel.py index.html scanner.py rkscan.py aidescan.py lynisscan.py wpuse
 done
 install -m 755 "$REPO_DIR/scripts/synergy-scan.sh" "$PANEL_DIR/synergy-scan.sh"
 
-# Credentials — pertahankan jika reinstall/update
+# Credentials + web root — pertahankan jika reinstall/update
 ADMIN_USER="scanadmin"
 ADMIN_PASS=""
+KEEP_WEB_ROOTS=""
+KEEP_DOMAIN=""
+KEEP_ALLOWED=""
 if [[ -f "$PANEL_DIR/panel.conf" ]]; then
     # shellcheck source=/dev/null
     . "$PANEL_DIR/panel.conf"
     ADMIN_USER="${USERNAME:-$ADMIN_USER}"
     ADMIN_PASS="${PASSWORD:-}"
     PANEL_PORT="${PORT:-$PANEL_PORT}"
-    log "panel.conf lama ditemukan — kredensial dipertahankan"
+    KEEP_WEB_ROOTS="${WEB_ROOTS:-}"
+    KEEP_DOMAIN="${DOMAIN_PATH:-}"
+    KEEP_ALLOWED="${ALLOWED_PREFIX:-}"
+    log "panel.conf lama ditemukan — kredensial & konfigurasi web root dipertahankan"
 fi
 if [[ -z "$ADMIN_PASS" ]]; then
     ADMIN_PASS=$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9' | head -c 20)
     log "Membuat kredensial panel baru"
 fi
 
-# Auto-detect domain WordPress pertama
+# --- Auto-detect layout web root (CyberPanel /home vs custom /var/www) ---
+WEB_ROOTS="/home/*/public_html"
 DOMAIN_PATH="/home/example.com/public_html"
-FIRST_WEB=$(ls -d /home/*/public_html 2>/dev/null | head -1 || true)
-if [[ -n "$FIRST_WEB" ]]; then
-    DOMAIN_PATH="$FIRST_WEB"
+ALLOWED_PREFIX="/home/,/var/www/,/srv/,/tmp/,/var/tmp/"
+
+detect_web_roots() {
+    # 1) CyberPanel style
+    if ls -d /home/*/public_html >/dev/null 2>&1; then
+        echo "/home/*/public_html"; return
+    fi
+    # 2) /var/www/<domain>/public_html (custom + subfolder)
+    if ls -d /var/www/*/public_html >/dev/null 2>&1; then
+        echo "/var/www/*/public_html"; return
+    fi
+    # 3) /var/www/<domain>/ (folder = domain, web root langsung)
+    #    Kecualikan /var/www/html supaya tidak dianggap "domain".
+    if ls -d /var/www/*/ >/dev/null 2>&1 && \
+       [[ -n "$(ls -d /var/www/*/ 2>/dev/null | grep -v '/var/www/html/' | head -1)" ]]; then
+        echo "/var/www/*"; return
+    fi
+    # 4) single site
+    if [[ -d /var/www/html ]]; then
+        echo "/var/www/html"; return
+    fi
+    echo "/home/*/public_html"
+}
+
+if [[ -n "$KEEP_WEB_ROOTS" ]]; then
+    WEB_ROOTS="$KEEP_WEB_ROOTS"
+    log "WEB_ROOTS dipertahankan: $WEB_ROOTS"
+else
+    WEB_ROOTS="$(detect_web_roots)"
+    log "WEB_ROOTS terdeteksi otomatis: $WEB_ROOTS"
+fi
+
+if [[ -n "$KEEP_DOMAIN" ]]; then
+    DOMAIN_PATH="$KEEP_DOMAIN"
+else
+    FIRST_WEB=$(ls -d $WEB_ROOTS 2>/dev/null | grep -v '/var/www/html$' | head -1 || true)
+    [[ -z "$FIRST_WEB" ]] && FIRST_WEB=$(ls -d $WEB_ROOTS 2>/dev/null | head -1 || true)
+    [[ -n "$FIRST_WEB" ]] && DOMAIN_PATH="$FIRST_WEB"
     log "DOMAIN_PATH otomatis: $DOMAIN_PATH"
 fi
+[[ -n "$KEEP_ALLOWED" ]] && ALLOWED_PREFIX="$KEEP_ALLOWED"
 
 cat >"$PANEL_DIR/panel.conf" <<EOF
 USERNAME=$ADMIN_USER
@@ -114,7 +157,9 @@ PASSWORD=$ADMIN_PASS
 PORT=$PANEL_PORT
 DOMAIN_PATH=$DOMAIN_PATH
 SCAN_LOG=/root/maldet_scan.log
-WEB_ROOTS=/home/*/public_html
+WEB_ROOTS=$WEB_ROOTS
+ALLOWED_PREFIX=$ALLOWED_PREFIX
+URL_SCHEME=https
 EOF
 chmod 600 "$PANEL_DIR/panel.conf"
 

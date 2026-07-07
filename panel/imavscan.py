@@ -20,9 +20,23 @@ import time
 
 BASE = "/usr/local/maldetect-panel"
 DATA = os.path.join(BASE, "data")
+CONF = os.path.join(BASE, "panel.conf")
 OUT = os.path.join(DATA, "imunify_latest.json")
 IMAV = "/usr/bin/imunify-antivirus"
 ALT_IMAV = "/usr/sbin/imunify-antivirus"
+
+
+def web_root_globs():
+    roots = "/home/*/public_html"
+    try:
+        with open(CONF) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("WEB_ROOTS="):
+                    roots = line.split("=", 1)[1].strip()
+    except FileNotFoundError:
+        pass
+    return [p.strip() for p in roots.split(",") if p.strip()]
 
 
 def imav_bin():
@@ -175,11 +189,16 @@ def do_scan_all():
     code, raw = run("%s malware user scan 2>&1" % bin_, timeout=7200)
     print(raw)
     if code != 0:
-        # fallback: queue tiap public_html
+        # fallback: queue tiap web root sesuai WEB_ROOTS
         import glob
-        for p in sorted(glob.glob("/home/*/public_html")):
-            print("==> scan %s" % p)
-            do_scan(p)
+        seen = set()
+        for pat in web_root_globs():
+            for p in sorted(glob.glob(pat)):
+                if p in seen:
+                    continue
+                seen.add(p)
+                print("==> scan %s" % p)
+                do_scan(p)
     do_sync()
     return 0
 

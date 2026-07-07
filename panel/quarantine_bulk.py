@@ -23,7 +23,25 @@ QSTORE = os.path.join(BASE, "quar_store")
 WL_FILE = os.path.join(DATA, "whitelist.json")
 QM_FILE = os.path.join(DATA, "quarantine.json")
 MALDET_SESS = "/usr/local/maldetect/sess"
-ALLOWED_PREFIX = ("/home/", "/tmp/", "/var/tmp/")
+CONF = os.path.join(BASE, "panel.conf")
+
+
+def _load_allowed_prefix():
+    try:
+        with open(CONF) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("ALLOWED_PREFIX="):
+                    vals = line.split("=", 1)[1].strip()
+                    out = tuple(p.strip() for p in vals.split(",") if p.strip())
+                    if out:
+                        return out
+    except FileNotFoundError:
+        pass
+    return ("/home/", "/var/www/", "/srv/", "/tmp/", "/var/tmp/")
+
+
+ALLOWED_PREFIX = _load_allowed_prefix()
 
 
 def read_json(path, default=None):
@@ -54,7 +72,8 @@ def domain_match(path, domain):
         return True
     if domain.startswith("/"):
         return path.startswith(domain.rstrip("/") + "/") or path == domain
-    return ("/home/%s/" % domain) in path or path.startswith("/home/%s/" % domain)
+    # domain berupa nama (bukan path): cocokkan di layout apapun
+    return ("/%s/" % domain) in path
 
 
 def quarantine(path, reason=""):

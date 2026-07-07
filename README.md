@@ -86,9 +86,27 @@ systemctl restart scanpanel
 | `USERNAME` | Login panel |
 | `PASSWORD` | Password panel |
 | `PORT` | Port HTTPS (default 9793) |
-| `WEB_ROOTS` | Glob path website (default `/home/*/public_html`) |
+| `WEB_ROOTS` | Glob path website (comma-separated). Lihat tabel layout di bawah |
 | `DOMAIN_PATH` | Path default untuk audit WP user |
+| `ALLOWED_PREFIX` | Prefix path yang boleh dikarantina/diinspeksi (comma-separated) |
+| `URL_SCHEME` | `http`/`https` untuk fitur Test URL |
 | `SCAN_LOG` | Log scan maldet |
+
+### Layout web root (server non-CyberPanel / custom)
+
+`install.sh` mendeteksi otomatis, tapi bisa di-set manual di `panel.conf`:
+
+| Layout server | `WEB_ROOTS` |
+|---------------|-------------|
+| CyberPanel | `/home/*/public_html` |
+| Custom `/var/www/<domain>/` (folder = domain) | `/var/www/*` |
+| Custom `/var/www/<domain>/public_html` | `/var/www/*/public_html` |
+| Single site | `/var/www/html` |
+| Gabungan | `/home/*/public_html,/var/www/*` |
+
+Setelah ubah, jalankan `systemctl restart scanpanel`. Panel akan auto-scan semua
+folder yang cocok saat memilih domain **"— Semua domain —"**, dan tetap bisa pilih
+per-domain dari dropdown.
 
 ## Perintah berguna
 

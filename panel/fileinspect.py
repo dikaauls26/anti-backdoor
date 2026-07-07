@@ -5,9 +5,35 @@ import re
 import json
 import time
 import pwd
+import glob
 import subprocess
 
-ALLOWED_PREFIX = ("/home/", "/tmp/", "/var/tmp/")
+BASE = "/usr/local/maldetect-panel"
+CONF = os.path.join(BASE, "panel.conf")
+
+
+def load_conf():
+    cfg = {
+        "WEB_ROOTS": "/home/*/public_html",
+        "ALLOWED_PREFIX": "/home/,/var/www/,/srv/,/tmp/,/var/tmp/",
+        "URL_SCHEME": "https",
+    }
+    try:
+        with open(CONF) as f:
+            for line in f:
+                line = line.strip()
+                if line and "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    cfg[k.strip()] = v.strip()
+    except FileNotFoundError:
+        pass
+    return cfg
+
+
+CFG = load_conf()
+ALLOWED_PREFIX = tuple(
+    p.strip() for p in CFG.get("ALLOWED_PREFIX", "").split(",") if p.strip()
+) or ("/home/", "/var/www/", "/tmp/", "/var/tmp/")
 MAX_BYTES = 120000
 MAX_LINES = 450
 
@@ -22,11 +48,32 @@ DANGER_RE = [
 ]
 
 
+def _domain_name(root):
+    norm = root.rstrip("/")
+    for suffix in ("/public_html", "/htdocs", "/httpdocs", "/www"):
+        if norm.endswith(suffix):
+            norm = norm[: -len(suffix)]
+            break
+    base = os.path.basename(norm)
+    if base in ("www", "html", ""):
+        parent = os.path.basename(os.path.dirname(norm))
+        return parent or base or root
+    return base
+
+
 def path_to_url(path):
+    scheme = CFG.get("URL_SCHEME", "https") or "https"
+    globs = [p.strip() for p in CFG.get("WEB_ROOTS", "").split(",") if p.strip()]
+    for pat in globs:
+        for root in glob.glob(pat):
+            root = root.rstrip("/")
+            if path.startswith(root + "/"):
+                rel = path[len(root) + 1:]
+                return "%s://%s/%s" % (scheme, _domain_name(root), rel)
+    # fallback lama untuk layout CyberPanel
     if path.startswith("/home/") and "/public_html/" in path:
         domain, rest = path.split("/public_html/", 1)
-        domain = domain.replace("/home/", "")
-        return "https://%s/%s" % (domain, rest)
+        return "%s://%s/%s" % (scheme, domain.replace("/home/", ""), rest)
     return None
 
 

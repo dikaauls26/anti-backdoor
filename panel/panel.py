@@ -28,12 +28,15 @@ WL_FILE = os.path.join(DATA, "whitelist.json")
 QM_FILE = os.path.join(DATA, "quarantine.json")
 MALDET = "/usr/local/sbin/maldet"
 MALDET_SESS = "/usr/local/maldetect/sess"
-ALLOWED_PREFIX = ("/home/", "/tmp/", "/var/tmp/")
 
 cfg = {
     "USERNAME": "scanadmin", "PASSWORD": "changeme", "PORT": "9793",
     "DOMAIN_PATH": "/home/a-listfilm.com/public_html",
     "SCAN_LOG": "/root/maldet_scan.log", "WEB_ROOTS": "/home/*/public_html",
+    # Prefix path yang boleh dikarantina/diinspeksi. Bisa di-override di panel.conf.
+    "ALLOWED_PREFIX": "/home/,/var/www/,/srv/,/tmp/,/var/tmp/",
+    # Skema URL untuk fitur "Test URL". http atau https.
+    "URL_SCHEME": "https",
 }
 try:
     with open(CONF) as f:
@@ -48,6 +51,59 @@ except FileNotFoundError:
 USERNAME = cfg["USERNAME"]
 PASSWORD = cfg["PASSWORD"]
 PORT = int(cfg["PORT"])
+ALLOWED_PREFIX = tuple(
+    p.strip() for p in cfg.get("ALLOWED_PREFIX", "").split(",") if p.strip()
+) or ("/home/", "/var/www/", "/tmp/", "/var/tmp/")
+
+
+def web_root_globs():
+    """Daftar pola glob web root dari WEB_ROOTS (comma-separated)."""
+    return [p.strip() for p in cfg["WEB_ROOTS"].split(",") if p.strip()]
+
+
+def web_roots_shell_expr():
+    """Shell expression yang meng-expand semua web root jadi list dir,
+    dipisah baris (untuk 'for d in $(...)') atau koma (maldet)."""
+    globs = " ".join("'%s'" % g.replace("'", "'\\''") for g in web_root_globs())
+    # ls -d expand glob; hanya direktori; unik.
+    return "ls -d %s 2>/dev/null | sort -u" % globs
+
+
+def domain_name_from_path(path):
+    """Ambil nama domain dari sebuah path web root, apapun layout-nya.
+    Mendukung:
+      /home/<domain>/public_html    (CyberPanel)
+      /var/www/<domain>             (custom, folder = domain)
+      /var/www/<domain>/public_html (custom + subfolder)
+      /var/www/html                 (single site)
+    """
+    if not path:
+        return path
+    norm = path.rstrip("/")
+    for suffix in ("/public_html", "/htdocs", "/httpdocs", "/www"):
+        if norm.endswith(suffix):
+            norm = norm[: -len(suffix)]
+            break
+    base = os.path.basename(norm)
+    if base in ("www", "html", ""):
+        # /var/www/html -> pakai parent yang bermakna, fallback ke path
+        parent = os.path.basename(os.path.dirname(norm))
+        return parent or base or path
+    return base
+
+
+def path_to_web_url(path):
+    """Petakan path file ke URL yang bisa diakses, berbasis WEB_ROOTS.
+    Mengembalikan None jika file bukan di dalam web root."""
+    scheme = cfg.get("URL_SCHEME", "https") or "https"
+    for pat in web_root_globs():
+        for root in glob.glob(pat):
+            root = root.rstrip("/")
+            if path.startswith(root + "/"):
+                rel = path[len(root) + 1:]
+                dom = domain_name_from_path(root)
+                return "%s://%s/%s" % (scheme, dom, rel)
+    return None
 SESSION_TTL = 60 * 60 * 12  # 12 jam
 SESSIONS = {}
 
@@ -98,15 +154,22 @@ def pid_alive(pid):
 
 def list_domains():
     out = []
-    for pat in cfg["WEB_ROOTS"].split(","):
-        for p in glob.glob(pat.strip()):
-            try:
-                name = p.split("/home/", 1)[1].split("/")[0]
-            except Exception:
-                name = p
-            out.append({"name": name, "path": p})
+    seen = set()
+    for pat in web_root_globs():
+        for p in glob.glob(pat):
+            if not os.path.isdir(p) or p in seen:
+                continue
+            seen.add(p)
+            out.append({"name": domain_name_from_path(p), "path": p})
     out.sort(key=lambda x: x["name"])
     return out
+
+
+def domain_label(dom):
+    """Label domain aman untuk semua layout (dipakai di judul job)."""
+    if not dom or dom == "ALL":
+        return "semua"
+    return domain_name_from_path(dom)
 
 
 # ---------- jobs ----------
@@ -873,18 +936,18 @@ class Handler(BaseHTTPRequestHandler):
             th = g("threshold", "8")
             th = str(int(th)) if th.isdigit() else "8"
             dom = g("domain", "ALL") or "ALL"
-            label = "semua" if dom == "ALL" else dom.split("/")[2] if "/home/" in dom else dom
+            label = domain_label(dom)
             jid = new_job("backdoor", "Scan Backdoor [%s] th=%s" % (label, th),
                           "python3 %s/scanner.py backdoor %s '%s'" % (BASE, th, dom))
             return self._json({"id": jid, "title": "Scan Backdoor"})
         if p == "/api/run/malware":
             dom = g("domain", "ALL") or "ALL"
             if dom == "ALL":
-                target = "$(ls -d /home/*/public_html 2>/dev/null | paste -sd, -)"
+                target = "$(%s)" % web_roots_shell_expr()
                 label = "semua"
             else:
-                target = "'%s'" % dom
-                label = dom.split("/")[2] if "/home/" in dom else dom
+                target = "'%s'" % dom.replace("'", "'\\''")
+                label = domain_label(dom)
             jid = new_job("malware", "Scan Malware [%s]" % label, "maldet -a %s" % target)
             return self._json({"id": jid, "title": "Scan Malware"})
         if p == "/api/run/imunify":
@@ -895,7 +958,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 esc = dom.replace("'", "'\\''")
                 cmd = "python3 %s/imavscan.py scan '%s'" % (BASE, esc)
-                label = dom.split("/")[2] if "/home/" in dom else dom
+                label = domain_label(dom)
             jid = new_job("imunify", "ImunifyAV Scan [%s]" % label, cmd)
             return self._json({"id": jid, "title": "ImunifyAV Scan"})
         if p == "/api/run/imunifysync":
@@ -908,21 +971,21 @@ class Handler(BaseHTTPRequestHandler):
             th = str(int(th)) if th.isdigit() else "8"
             if dom == "ALL":
                 cmd = (
-                    "for d in /home/*/public_html; do "
+                    "for d in $(%s); do "
                     "/usr/local/maldetect-panel/synergy-scan.sh \"$d\" %s; done"
-                ) % th
+                ) % (web_roots_shell_expr(), th)
                 label = "semua"
             else:
                 esc = dom.replace("'", "'\\''")
                 cmd = "/usr/local/maldetect-panel/synergy-scan.sh '%s' %s" % (esc, th)
-                label = dom.split("/")[2] if "/home/" in dom else dom
+                label = domain_label(dom)
             jid = new_job("synergy", "Scan Sinergi [%s]" % label, cmd)
             return self._json({"id": jid, "title": "Scan Sinergi"})
         if p == "/api/run/newfiles":
             days = g("days", "3")
             days = str(int(days)) if days.isdigit() else "3"
             dom = g("domain", "ALL") or "ALL"
-            label = "semua" if dom == "ALL" else dom.split("/")[2] if "/home/" in dom else dom
+            label = domain_label(dom)
             jid = new_job("newfiles", "File Baru [%s] %sh" % (label, days),
                           "python3 %s/scanner.py newfiles %s '%s'" % (BASE, days, dom))
             return self._json({"id": jid, "title": "Deteksi File Baru"})
@@ -960,8 +1023,7 @@ class Handler(BaseHTTPRequestHandler):
             esc_dom = dom.replace("'", "'\\''")
             label_src = {"imunify": "ImunifyAV", "backdoor": "Backdoor",
                          "malware": "maldet", "all": "Semua"}[source]
-            label_dom = "semua" if dom == "ALL" else (
-                dom.split("/")[2] if "/home/" in dom else dom)
+            label_dom = domain_label(dom)
             cmd = (
                 "python3 %s/quarantine_bulk.py '%s' '%s' %s"
                 % (BASE, source, esc_dom, th)
@@ -990,7 +1052,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"id": jid, "title": "Karantina Terpilih", "count": len(clean)})
         if p == "/api/run/wpcore":
             dom = g("domain", "ALL") or "ALL"
-            label = "semua" if dom == "ALL" else dom.split("/")[2] if "/home/" in dom else dom
+            label = domain_label(dom)
             esc = dom.replace("'", "'\\''")
             jid = new_job("wpcore", "WP Core Check [%s]" % label,
                           "python3 %s/scanner.py wpcore '%s'" % (BASE, esc))

@@ -8,8 +8,21 @@ PORT=9793
 # Default domain path (for WP user audit)
 DOMAIN_PATH=/home/example.com/public_html
 
-# Comma-separated glob patterns for web roots
+# Comma-separated glob patterns for web roots.
+# Pilih sesuai layout server (install.sh mendeteksi otomatis):
+#   CyberPanel          : /home/*/public_html
+#   Custom /var/www     : /var/www/*            (folder = domain, web root langsung)
+#   Custom + subfolder  : /var/www/*/public_html
+#   Single site         : /var/www/html
+# Boleh gabung beberapa pola: /home/*/public_html,/var/www/*
 WEB_ROOTS=/home/*/public_html
+
+# Prefix path yang boleh dikarantina/diinspeksi (comma-separated).
+# Wajib mencakup lokasi web root di atas.
+ALLOWED_PREFIX=/home/,/var/www/,/srv/,/tmp/,/var/tmp/
+
+# Skema URL untuk fitur "Test URL" (cek backdoor aktif via browser): http | https
+URL_SCHEME=https
 
 # maldet scan log location
 SCAN_LOG=/root/maldet_scan.log
