@@ -369,6 +369,13 @@ def get_status():
     d["imunify_when"] = im.get("generated")
     d["imunify_count"] = im.get("count", 0)
     d["imunify_scanning"] = "YES" if run("pgrep -f '[i]munify.*malware' | head -1").strip() else "no"
+    wp = read_json(os.path.join(DATA, "wpcore_latest.json"))
+    if wp:
+        d["wpcore_when"] = wp.get("generated")
+        d["wpcore_flagged"] = wp.get("flagged", len(wp.get("items", [])))
+    else:
+        d["wpcore_when"] = None
+        d["wpcore_flagged"] = None
     return d
 
 
@@ -475,6 +482,7 @@ def findings():
     rk = read_json(os.path.join(DATA, "rkhunter_latest.json"))
     aide = read_json(os.path.join(DATA, "aide_latest.json"))
     lyn = read_json(os.path.join(DATA, "lynis_latest.json"))
+    wp = read_json(os.path.join(DATA, "wpcore_latest.json"))
     im = imunify_summary()
     wl = wl_paths_enabled()
     qpaths = {e["orig"] for e in qm_load()}
@@ -483,8 +491,13 @@ def findings():
             p = it.get("path", "")
             it["whitelisted"] = p in wl
             it["quarantined"] = p in qpaths
+    if wp:
+        for it in wp.get("items", []):
+            p = it.get("path", "")
+            it["whitelisted"] = p in wl
+            it["quarantined"] = p in qpaths
     return {"backdoor": bd, "newfiles": nf, "malware": malware_summary(),
-            "imunify": im, "rkhunter": rk, "aide": aide, "lynis": lyn,
+            "imunify": im, "wpcore": wp, "rkhunter": rk, "aide": aide, "lynis": lyn,
             "whitelist": wl_load(), "quarantine": qm_load(),
             "quarantine_recreated": quarantine_recreated()}
 
@@ -559,6 +572,15 @@ class Handler(BaseHTTPRequestHandler):
             fp = parse_qs(u.query).get("path", [""])[0]
             return self._json(fileinspect_cmd("probe", fp) if fp else {"error": "path kosong"})
         return self._send("404", code=404)
+
+    def _read_json_body(self):
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        if not length:
+            return {}
+        try:
+            return json.loads(self.rfile.read(length).decode("utf-8"))
+        except Exception:
+            return {}
 
     def do_POST(self):
         if not self._auth_ok():
@@ -673,6 +695,29 @@ class Handler(BaseHTTPRequestHandler):
                 cmd,
             )
             return self._json({"id": jid, "title": "Bulk Karantina"})
+        if p == "/api/run/quarantine-selected":
+            body = self._read_json_body()
+            paths = body.get("paths", [])
+            if not isinstance(paths, list) or not paths:
+                return self._json({"error": "tidak ada file dipilih"}, 400)
+            clean = []
+            for raw in paths[:200]:
+                if isinstance(raw, str) and any(raw.startswith(a) for a in ALLOWED_PREFIX):
+                    clean.append(raw)
+            if not clean:
+                return self._json({"error": "path tidak valid"}, 400)
+            pf = os.path.join(JOBS, time.strftime("%y%m%d-%H%M%S") + "-qsel.json")
+            write_json(pf, clean)
+            cmd = "python3 %s/quarantine_bulk.py --file '%s'" % (BASE, pf.replace("'", "'\\''"))
+            jid = new_job("quar-bulk", "Karantina Terpilih (%d file)" % len(clean), cmd)
+            return self._json({"id": jid, "title": "Karantina Terpilih", "count": len(clean)})
+        if p == "/api/run/wpcore":
+            dom = g("domain", "ALL") or "ALL"
+            label = "semua" if dom == "ALL" else dom.split("/")[2] if "/home/" in dom else dom
+            esc = dom.replace("'", "'\\''")
+            jid = new_job("wpcore", "WP Core Check [%s]" % label,
+                          "python3 %s/scanner.py wpcore '%s'" % (BASE, esc))
+            return self._json({"id": jid, "title": "WP Core Check"})
         if p == "/api/quarantine/add":
             return self._json(quarantine(g("path"), g("reason")))
         if p == "/api/quarantine/restore":

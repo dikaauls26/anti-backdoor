@@ -14,6 +14,9 @@ import json
 import glob
 import time
 import pwd
+import hashlib
+import urllib.request
+import urllib.error
 
 BASE = "/usr/local/maldetect-panel"
 DATA = os.path.join(BASE, "data")
@@ -258,9 +261,197 @@ def do_newfiles(days, target):
         print("  %s  %s  %dB  (%s)" % (it["mtime"], it["path"], it["size"], it["owner"]))
 
 
+WP_CORE_PREFIXES = ("wp-includes/", "wp-admin/")
+WP_ROOT_FILES = {
+    "index.php", "wp-activate.php", "wp-blog-header.php", "wp-comments-post.php",
+    "wp-config-sample.php", "wp-cron.php", "wp-links-opml.php", "wp-load.php",
+    "wp-login.php", "wp-mail.php", "wp-settings.php", "wp-signup.php",
+    "wp-trackback.php", "xmlrpc.php",
+}
+SUSPICIOUS_NAMES = re.compile(
+    r"(compat|runtime|bridge|shell|backdoor|users\.php|install\.php|cache-|wp-[a-z]{6,}\.php)",
+    re.I,
+)
+
+
+def wp_version(webroot):
+    vf = os.path.join(webroot, "wp-includes", "version.php")
+    try:
+        with open(vf, "r", errors="replace") as f:
+            txt = f.read(4096)
+    except OSError:
+        return None
+    m = re.search(r"\$wp_version\s*=\s*['\"]([^'\"]+)", txt)
+    return m.group(1) if m else None
+
+
+def fetch_checksums(version, locale="en_US"):
+    url = (
+        "https://api.wordpress.org/core/checksums/1.0/"
+        "?version=%s&locale=%s" % (version, locale)
+    )
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
+        print("Gagal ambil checksum WP %s: %s" % (version, e))
+        return None
+    if data.get("checksums"):
+        return data["checksums"]
+    return None
+
+
+def file_md5(path):
+    h = hashlib.md5()
+    try:
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+    except OSError:
+        return None
+    return h.hexdigest()
+
+
+def is_core_scope(rel):
+    if rel in WP_ROOT_FILES:
+        return True
+    return rel.startswith(WP_CORE_PREFIXES)
+
+
+def scan_wp_root(webroot, checksums, version):
+    items = []
+    webroot = webroot.rstrip("/")
+    seen = set()
+
+    def add_item(path, rel, kind, detail, severity="tinggi"):
+        if path in seen:
+            return
+        seen.add(path)
+        try:
+            st = os.stat(path)
+        except OSError:
+            return
+        items.append({
+            "path": path,
+            "rel": rel,
+            "kind": kind,
+            "detail": detail,
+            "severity": severity,
+            "wp_version": version,
+            "mtime": time.strftime("%Y-%m-%d %H:%M", time.localtime(st.st_mtime)),
+            "owner": owner(path),
+            "size": st.st_size,
+        })
+
+    for rel in WP_ROOT_FILES:
+        p = os.path.join(webroot, rel)
+        if os.path.isfile(p):
+            if checksums and rel in checksums:
+                md5 = file_md5(p)
+                if md5 and md5 != checksums[rel]:
+                    add_item(p, rel, "modified_core",
+                               "Hash tidak cocok dengan core WP %s" % version)
+            elif checksums and rel not in checksums:
+                add_item(p, rel, "unknown_core", "File root tidak ada di manifest WP")
+
+    for prefix in WP_CORE_PREFIXES:
+        base = os.path.join(webroot, prefix.rstrip("/"))
+        if not os.path.isdir(base):
+            continue
+        for dirpath, dirnames, filenames in os.walk(base):
+            dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+            for name in filenames:
+                if name.endswith(".md") or name == "index.html":
+                    continue
+                p = os.path.join(dirpath, name)
+                if os.path.islink(p):
+                    continue
+                rel = p[len(webroot) + 1:].replace("\\", "/")
+                ext = os.path.splitext(name)[1].lower()
+                if rel not in checksums:
+                    detail = "File tambahan — tidak ada di core WP %s" % version
+                    sev = "tinggi"
+                    if ext in PHP_EXT or "php" in name.lower():
+                        if SUSPICIOUS_NAMES.search(rel):
+                            detail += " (nama mencurigakan)"
+                        add_item(p, rel, "extra_file", detail, sev)
+                    elif ext in (".js", ".css", ".png", ".jpg", ".gif", ".svg", ".woff", ".woff2"):
+                        pass  # asset tambahan — abaikan
+                    else:
+                        add_item(p, rel, "extra_file", detail, "sedang")
+                elif ext in PHP_EXT or ext in (".js", ".css"):
+                    md5 = file_md5(p)
+                    if md5 and md5 != checksums[rel]:
+                        add_item(p, rel, "modified_core",
+                                 "Core file diubah (hash beda dari WP resmi)", "tinggi")
+
+    mu = os.path.join(webroot, "wp-content", "mu-plugins")
+    if os.path.isdir(mu):
+        for name in os.listdir(mu):
+            if name.startswith("."):
+                continue
+            p = os.path.join(mu, name)
+            if not os.path.isfile(p):
+                continue
+            rel = "wp-content/mu-plugins/" + name
+            detail = "Must-use plugin — periksa manual (sering dipakai backdoor)"
+            sev = "sedang"
+            if SUSPICIOUS_NAMES.search(name):
+                sev = "tinggi"
+                detail = "Nama mu-plugin mencurigakan — kemungkinan backdoor"
+            add_item(p, rel, "mu_plugin", detail, sev)
+
+    return items
+
+
+def do_wpcore(target):
+    cfg = load_conf()
+    roots, is_all = resolve_targets(cfg, target)
+    all_items = []
+    print("Scan WP Core anomaly: %s" % time.strftime("%Y-%m-%d %H:%M:%S"))
+    print("Target: %s" % ("SEMUA DOMAIN" if is_all else target))
+    print("-" * 60)
+    for webroot in roots:
+        if not os.path.isfile(os.path.join(webroot, "wp-config.php")):
+            if not is_all:
+                print("Bukan instalasi WordPress: %s" % webroot)
+            continue
+        ver = wp_version(webroot)
+        if not ver:
+            print("Lewati %s — wp-includes/version.php tidak ditemukan" % webroot)
+            continue
+        print("Domain: %s | WordPress %s" % (webroot, ver))
+        checksums = fetch_checksums(ver)
+        if not checksums:
+            print("  Lewati — checksum WP tidak tersedia")
+            continue
+        items = scan_wp_root(webroot, checksums, ver)
+        print("  -> %d file aneh / tidak standar" % len(items))
+        all_items.extend(items)
+
+    order = {"tinggi": 3, "sedang": 2, "rendah": 1}
+    all_items.sort(key=lambda x: (-order.get(x["severity"], 0), x["path"]))
+    all_items = all_items[:500]
+    out = {
+        "type": "wpcore",
+        "target": ("ALL" if is_all else target),
+        "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_ts": int(time.time()),
+        "flagged": len(all_items),
+        "items": all_items,
+    }
+    os.makedirs(DATA, exist_ok=True)
+    with open(os.path.join(DATA, "wpcore_latest.json"), "w") as f:
+        json.dump(out, f)
+    print("-" * 60)
+    print("Selesai. Total file aneh: %d" % len(all_items))
+    for it in all_items[:30]:
+        print("[%s] %s — %s" % (it["kind"], it["path"], it["detail"]))
+
+
 def main():
     if len(sys.argv) < 2:
-        print("usage: scanner.py backdoor|newfiles [arg] [target]")
+        print("usage: scanner.py backdoor|newfiles|wpcore [arg] [target]")
         return 1
     mode = sys.argv[1]
     if mode == "backdoor":
@@ -271,6 +462,9 @@ def main():
         days = int(sys.argv[2]) if len(sys.argv) > 2 else 2
         target = sys.argv[3] if len(sys.argv) > 3 else "ALL"
         do_newfiles(days, target)
+    elif mode == "wpcore":
+        target = sys.argv[2] if len(sys.argv) > 2 else "ALL"
+        do_wpcore(target)
     else:
         print("mode tidak dikenal: %s" % mode)
         return 1

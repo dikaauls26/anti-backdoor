@@ -3,8 +3,9 @@
 
 Usage:
   quarantine_bulk.py SOURCE [DOMAIN] [MIN_SCORE]
+  quarantine_bulk.py --file /path/to/paths.json
 
-SOURCE: imunify | backdoor | malware | all
+SOURCE: imunify | backdoor | malware | all | selected (via --file)
 DOMAIN: ALL atau path public_html (default ALL)
 MIN_SCORE: threshold backdoor (default 12)
 """
@@ -141,15 +142,21 @@ def collect_paths(source, domain="ALL", min_score=12):
 
 
 def main():
-    source = (sys.argv[1] if len(sys.argv) > 1 else "all").lower()
-    domain = sys.argv[2] if len(sys.argv) > 2 else "ALL"
-    min_score = int(sys.argv[3]) if len(sys.argv) > 3 and str(sys.argv[3]).isdigit() else 12
-
-    if source not in ("imunify", "backdoor", "malware", "all"):
-        print("SOURCE tidak dikenal:", source)
-        return 1
-
-    paths = collect_paths(source, domain, min_score)
+    if len(sys.argv) > 2 and sys.argv[1] == "--file":
+        paths = read_json(sys.argv[2], [])
+        if not isinstance(paths, list):
+            print("File paths harus berisi array JSON")
+            return 1
+        source = "selected"
+        domain = "CHECKBOX"
+    else:
+        source = (sys.argv[1] if len(sys.argv) > 1 else "all").lower()
+        domain = sys.argv[2] if len(sys.argv) > 2 else "ALL"
+        min_score = int(sys.argv[3]) if len(sys.argv) > 3 and str(sys.argv[3]).isdigit() else 12
+        if source not in ("imunify", "backdoor", "malware", "all"):
+            print("SOURCE tidak dikenal:", source)
+            return 1
+        paths = collect_paths(source, domain, min_score)
     print("=== Bulk Karantina [%s] domain=%s ===" % (source, domain))
     print("Target: %d file" % len(paths))
     if not paths:
@@ -170,7 +177,7 @@ def main():
             failed += 1
             print("  -> GAGAL:", res.get("error"))
 
-    if source in ("imunify", "all"):
+    if source in ("imunify", "all", "selected"):
         print("Sync Imunify malicious list...")
         subprocess.run(["python3", os.path.join(BASE, "imavscan.py"), "sync"])
 

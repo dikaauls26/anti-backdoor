@@ -82,7 +82,7 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
       <li class="nav-item"><a class="nav-link" href="#" data-page="updates"><i class="bi bi-stars me-2"></i>Updates</a></li>
     </ul>
   </div>
-  <div class="p-3 border-top small text-muted">v5.1 &middot; Bulk Karantina + ImunifyAV</div>
+  <div class="p-3 border-top small text-muted">v5.2 &middot; Checkbox Karantina + WP Core</div>
 </nav>
 
 <div id="main">
@@ -171,6 +171,15 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
         <div class="col-md-6 col-xl-3">
           <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-wordpress text-secondary me-1"></i> WP Core Check</h6>
+              <p class="small text-muted">Deteksi file aneh/tambahan di wp-includes &amp; wp-admin vs manifest WordPress resmi.</p>
+              <button class="btn btn-secondary btn-sm w-100 mt-2 text-white" onclick="runAction('wpcore','')"><i class="bi bi-play-fill"></i> Scan WP Core</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
               <h6 class="fw-semibold"><i class="bi bi-file-earmark-plus text-info me-1"></i> File Baru</h6>
               <p class="small text-muted">File yang dibuat/diubah dalam N hari terakhir.</p>
               <div class="input-group input-group-sm mb-2"><span class="input-group-text">Hari</span><input type="number" id="nfdays" class="form-control" value="3"></div>
@@ -239,22 +248,15 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
         <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-backdoor">Backdoor <span class="badge bg-danger" id="bd-count">0</span></a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-imunify">ImunifyAV <span class="badge bg-primary" id="imav-count">0</span></a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-malware">maldet/ClamAV <span class="badge bg-warning text-dark" id="mal-count">0</span></a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-wpcore">WP Aneh <span class="badge bg-secondary" id="wp-count">0</span></a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-newfiles">File Baru <span class="badge bg-info" id="nf-count">0</span></a></li>
       </ul>
       <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
         <button class="btn btn-outline-primary btn-sm" onclick="loadFindings()"><i class="bi bi-arrow-clockwise"></i> Muat Ulang</button>
-        <div class="btn-group">
-          <button type="button" class="btn btn-danger btn-sm dropdown-toggle" data-bs-toggle="dropdown">
-            <i class="bi bi-archive-fill me-1"></i>Bulk Karantina
-          </button>
-          <ul class="dropdown-menu dropdown-menu-sm">
-            <li><a class="dropdown-item" href="#" onclick="qBulkAll('imunify');return false">Semua ImunifyAV</a></li>
-            <li><a class="dropdown-item" href="#" onclick="qBulkAll('backdoor');return false">Semua Backdoor</a></li>
-            <li><a class="dropdown-item" href="#" onclick="qBulkAll('malware');return false">Semua maldet/ClamAV</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item fw-semibold text-danger" href="#" onclick="qBulkAll('all');return false">Karantina Semua Temuan</a></li>
-          </ul>
-        </div>
+        <button class="btn btn-danger btn-sm" id="btnQSel" onclick="qBulkSelected()" disabled>
+          <i class="bi bi-archive-fill me-1"></i>Karantina Terpilih (0)
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="qClearSel()">Bersihkan Pilihan</button>
         <select id="minscore" class="form-select form-select-sm" style="width:auto" onchange="renderFindings()">
           <option value="0">Skor: semua</option><option value="8">Skor &ge; 8</option><option value="12" selected>Skor &ge; 12</option>
         </select>
@@ -263,7 +265,7 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
       </div>
       <div class="alert alert-light border small mb-3 py-2">
         <i class="bi bi-info-circle text-primary me-1"></i>
-        <strong>Karantina</strong> — isolasi file berbahaya (tidak bisa diakses web).
+        <strong>Karantina</strong> — centang file lalu <b>Karantina Terpilih</b> (background job). File WP bawaan tidak ikut tercentang otomatis.
         <span class="mx-2 text-muted">|</span>
         <strong>Whitelist</strong> — tandai file sah, tidak akan diflag / dikarantina.
         <span class="mx-2 text-muted">|</span>
@@ -277,6 +279,7 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
           </div>
           <div class="card border-0 shadow-sm" id="bd-table-wrap"><div class="card-body">
             <table id="tblBackdoor" class="table table-hover table-sm w-100"><thead><tr>
+              <th style="width:28px"><input type="checkbox" class="form-check-input" title="Pilih semua" onchange="qToggleTable('tblBackdoor',this.checked)"></th>
               <th>Skor</th><th>File</th><th>Indikasi</th><th>Owner</th><th>Diubah</th><th>Aksi</th>
             </tr></thead><tbody></tbody></table>
           </div></div>
@@ -290,7 +293,6 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
           <div class="d-flex flex-wrap gap-2 mb-3">
             <button class="btn btn-primary btn-sm" onclick="runAction('imunify','')"><i class="bi bi-play-fill me-1"></i>Scan ImunifyAV</button>
             <button class="btn btn-outline-primary btn-sm" onclick="runAction('imunifysync','')"><i class="bi bi-arrow-clockwise me-1"></i>Sync Daftar</button>
-            <button class="btn btn-danger btn-sm" onclick="qBulkAll('imunify')"><i class="bi bi-archive-fill me-1"></i>Karantina Semua</button>
           </div>
           <p id="imavsummary" class="small text-muted"></p>
           <div id="imav-empty" class="empty-hint d-none">
@@ -299,6 +301,7 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
           </div>
           <div class="card border-0 shadow-sm" id="imav-table-wrap"><div class="card-body">
             <table id="tblImunify" class="table table-hover table-sm w-100"><thead><tr>
+              <th style="width:28px"><input type="checkbox" class="form-check-input" onchange="qToggleTable('tblImunify',this.checked)"></th>
               <th>Signature</th><th>File</th><th>User</th><th>Status</th><th>Aksi</th>
             </tr></thead><tbody></tbody></table>
           </div></div>
@@ -311,7 +314,29 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
           </div>
           <div class="card border-0 shadow-sm" id="mal-table-wrap"><div class="card-body">
             <table id="tblMalware" class="table table-hover table-sm w-100"><thead><tr>
+              <th style="width:28px"><input type="checkbox" class="form-check-input" onchange="qToggleTable('tblMalware',this.checked)"></th>
               <th>Signature</th><th>File</th><th>Aksi</th>
+            </tr></thead><tbody></tbody></table>
+          </div></div>
+        </div>
+        <div class="tab-pane fade" id="tab-wpcore">
+          <div class="alert alert-secondary border small mb-3 py-2">
+            <i class="bi bi-wordpress text-primary me-1"></i>
+            Membandingkan <code>wp-includes</code> / <code>wp-admin</code> dengan manifest resmi WordPress.org.
+            File <b>tambahan</b> atau <b>core yang diubah</b> ditandai — centang lalu karantina manual.
+          </div>
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <button class="btn btn-secondary btn-sm text-white" onclick="runAction('wpcore','')"><i class="bi bi-play-fill me-1"></i>Scan WP Core</button>
+          </div>
+          <p id="wpsummary" class="small text-muted"></p>
+          <div id="wp-empty" class="empty-hint d-none">
+            <i class="bi bi-wordpress d-block"></i>
+            <p class="mb-0 mt-2">Belum ada hasil.<br>Jalankan <strong>Scan WP Core</strong> untuk deteksi file aneh di wp-includes/wp-admin.</p>
+          </div>
+          <div class="card border-0 shadow-sm" id="wp-table-wrap"><div class="card-body">
+            <table id="tblWpcore" class="table table-hover table-sm w-100"><thead><tr>
+              <th style="width:28px"><input type="checkbox" class="form-check-input" onchange="qToggleTable('tblWpcore',this.checked)"></th>
+              <th>Tipe</th><th>File</th><th>Detail</th><th>Owner</th><th>Aksi</th>
             </tr></thead><tbody></tbody></table>
           </div></div>
         </div>
@@ -801,6 +826,7 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 var DOMAIN='ALL',FIND=null,curJob=null,jobTimer=null,WPUSERS=null,FD_PATH='',fdModal=null;
+var SEL_PATHS=new Set();
 var dtLang={search:'Cari:',lengthMenu:'Tampilkan _MENU_ data',info:'_START_-_END_ dari _TOTAL_',paginate:{previous:'&laquo;',next:'&raquo;'},emptyTable:'Tidak ada data',zeroRecords:'Tidak ditemukan'};
 var titles={dash:'Dashboard',scan:'Scan',findings:'Temuan Virus',system:'Scan Sistem',quar:'Karantina',whitelist:'Whitelist',jobs:'Riwayat Job',docs:'Bantuan',updates:'Updates'};
 var dts={},jobsBusy=false;
@@ -817,6 +843,41 @@ function confirmAct(title,text){return Swal.fire({title:title,text:text,icon:'qu
 function btnDetail(p){return '<button class="btn btn-outline-primary btn-sm btn-act me-1" onclick="openFileDetail(\''+p+'\')"><i class="bi bi-search me-1"></i>Detail</button>'}
 function fileLink(path,enc,extra){return '<a href="#" class="path-cell text-primary path-link" onclick="openFileDetail(\''+enc+'\');return false"><i class="bi bi-file-earmark-code me-1"></i>'+esc(path)+'</a>'+(extra||'')}
 function btnKarantina(p){return '<button class="btn btn-danger btn-sm btn-act me-1" onclick="qAdd(\''+p+'\')"><i class="bi bi-archive me-1"></i>Karantina</button>'}
+function chkCell(rawPath,disabled){
+  var safe=esc(rawPath);
+  var on=SEL_PATHS.has(rawPath)?' checked':'';
+  var dis=disabled?' disabled':'';
+  return '<input type="checkbox" class="form-check-input q-chk" data-path="'+safe+'"'+on+dis+' onchange="qToggleSel(this)">';
+}
+function updateSelBtn(){
+  var n=SEL_PATHS.size;
+  $('#btnQSel').prop('disabled',n===0).html('<i class="bi bi-archive-fill me-1"></i>Karantina Terpilih ('+n+')');
+}
+function qToggleSel(el){
+  var p=el.getAttribute('data-path');
+  if(el.checked)SEL_PATHS.add(p);else SEL_PATHS.delete(p);
+  updateSelBtn();
+}
+function qToggleTable(tblId,on){
+  $('#'+tblId+' .q-chk:not(:disabled)').each(function(){this.checked=on;qToggleSel(this);});
+}
+function qClearSel(){
+  SEL_PATHS.clear();
+  $('.q-chk').prop('checked',false);
+  updateSelBtn();
+}
+function qBulkSelected(){
+  if(!SEL_PATHS.size){toastErr('Centang minimal 1 file');return;}
+  confirmAct('Karantina '+SEL_PATHS.size+' file terpilih?','Hanya file yang Anda centang yang akan dikarantina (background job). File WP bawaan tidak ikut kecuali Anda centang.').then(function(r){
+    if(!r.isConfirmed)return;
+    fetch('/api/run/quarantine-selected',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({paths:Array.from(SEL_PATHS)})})
+      .then(function(r){return r.json();}).then(function(d){
+        if(d.error){toastErr(d.error);return;}
+        toastOk('Karantina terpilih dimulai ('+(d.count||'?')+' file)');openJob(d.id);loadJobs();
+        qClearSel();
+      });
+  });
+}
 function btnWhitelist(p){return '<button class="btn btn-outline-success btn-sm btn-act" onclick="wlAddPath(\''+p+'\')"><i class="bi bi-shield-check me-1"></i>Whitelist</button>'}
 function btnCabutWl(p){return '<button class="btn btn-outline-secondary btn-sm btn-act" onclick="wlToggle(\''+p+'\')"><i class="bi bi-shield-x me-1"></i>Cabut Whitelist</button>'}
 function toggleEmpty(id,empty,hasRows){$('#'+empty).toggleClass('d-none',hasRows);$('#'+id).toggleClass('d-none',!hasRows)}
@@ -1024,24 +1085,27 @@ function renderFindings(){
     else if(it.whitelisted)act=btnCabutWl(enc(it.path));
     else act=btnDetail(enc(it.path))+btnKarantina(enc(it.path))+btnWhitelist(enc(it.path));
     var ep=enc(it.path);
-    return ['<span class="score-badge '+scoreCls(it.score)+'">'+it.score+'</span>',
+    var canQ=!it.quarantined&&!it.whitelisted;
+    return [chkCell(it.path,!canQ),
+      '<span class="score-badge '+scoreCls(it.score)+'">'+it.score+'</span>',
       fileLink(it.path,ep,' '+stx)+'<br><small class="text-muted">'+esc(it.snippet||'').substring(0,100)+'</small>',
       chips,esc(it.owner),esc(it.mtime),act];
   });
-  initDT('tblBackdoor',{data:bdrows,order:[[0,'desc']],columnDefs:[{targets:-1,orderable:false}]});
+  initDT('tblBackdoor',{data:bdrows,order:[[1,'desc']],columnDefs:[{targets:[0,-1],orderable:false}]});
   toggleEmpty('bd-table-wrap','bd-empty',bitems.length>0);
 
   var mh=mal.hits||[];$('#mal-count').text(mh.length);
   $('#malsummary').text(mal.summary||'Belum ada scan maldet/ClamAV.');
   var malrows=mh.map(function(h){
     var ep=enc(h.path);
-    return [esc(h.sig),fileLink(h.path,ep,''),
+    return [chkCell(h.path,false),esc(h.sig),fileLink(h.path,ep,''),
       btnDetail(ep)+btnKarantina(ep)+btnWhitelist(ep)];
   });
-  initDT('tblMalware',{data:malrows,columnDefs:[{targets:-1,orderable:false}]});
+  initDT('tblMalware',{data:malrows,columnDefs:[{targets:[0,-1],orderable:false}]});
   toggleEmpty('mal-table-wrap','mal-empty',mh.length>0);
 
   renderImunify(FIND.imunify||{});
+  renderWpcore(FIND.wpcore||{});
 
   var nfitems=(nf&&nf.items)?nf.items:[];
   $('#nf-count').text(nfitems.length);
@@ -1096,10 +1160,30 @@ function renderImunify(im){
     if(it.quarantined)act='<span class="text-muted small">Sudah dikarantina</span>';
     else if(it.whitelisted)act=btnCabutWl(ep);
     else act=btnDetail(ep)+btnKarantina(ep)+btnWhitelist(ep);
-    return [esc(it.signature||'ImunifyAV'),fileLink(it.path,ep,''),esc(it.user||'-'),st,act];
+    var canQ=!it.quarantined&&!it.whitelisted;
+    return [chkCell(it.path,!canQ),esc(it.signature||'ImunifyAV'),fileLink(it.path,ep,''),esc(it.user||'-'),st,act];
   });
-  initDT('tblImunify',{data:rows,columnDefs:[{targets:-1,orderable:false}]});
+  initDT('tblImunify',{data:rows,columnDefs:[{targets:[0,-1],orderable:false}]});
   toggleEmpty('imav-table-wrap','imav-empty',items.length>0);
+}
+
+function renderWpcore(wp){
+  var items=(wp&&wp.items)?wp.items:[];
+  $('#wp-count').text(items.length);
+  var meta=(wp&&wp.generated)?('Scan: '+wp.generated+' | '+items.length+' file aneh'):'belum scan';
+  $('#wpsummary').text(meta);
+  var rows=items.map(function(it){
+    var ep=enc(it.path);
+    var canQ=!it.quarantined&&!it.whitelisted;
+    var kindBadge='<span class="badge bg-'+(it.severity==='tinggi'?'danger':(it.severity==='sedang'?'warning text-dark':'secondary'))+'">'+esc(it.kind||'?')+'</span>';
+    var act='';
+    if(it.quarantined)act='<span class="text-muted small">Sudah dikarantina</span>';
+    else if(it.whitelisted)act=btnCabutWl(ep);
+    else act=btnDetail(ep)+btnKarantina(ep)+btnWhitelist(ep);
+    return [chkCell(it.path,!canQ),kindBadge,fileLink(it.path,ep,''),'<small>'+esc(it.detail||'')+'</small>',esc(it.owner||'-'),act];
+  });
+  initDT('tblWpcore',{data:rows,columnDefs:[{targets:[0,-1],orderable:false}]});
+  toggleEmpty('wp-table-wrap','wp-empty',items.length>0);
 }
 
 function rkSevBadge(s){var m={tinggi:'danger',sedang:'warning',rendah:'secondary'};
@@ -1278,20 +1362,6 @@ function qSweepOne(p){confirmAct('Hapus file yang muncul lagi?','File ini sudah 
   });
 })}
 
-function qBulkAll(source){
-  var labels={imunify:'ImunifyAV',backdoor:'Backdoor',malware:'maldet/ClamAV',all:'SEMUA temuan'};
-  var th=$('#minscore').val()||'12';
-  var domLbl=DOMAIN==='ALL'?'semua domain':(DOMAIN.split('/')[2]||DOMAIN);
-  confirmAct('Bulk karantina '+labels[source]+'?','Job background akan mengarantina semua file '+labels[source]+' untuk '+domLbl+' yang belum dikarantina. Lihat progress di Riwayat Job.').then(function(r){
-    if(!r.isConfirmed)return;
-    var extra='&source='+enc(source)+'&threshold='+enc(th);
-    if(DOMAIN!=='ALL')extra+='&domain='+enc(DOMAIN);
-    api('/api/run/quarantine-bulk?x=1'+extra,{method:'POST'}).then(function(d){
-      if(d.error){toastErr(d.error);return;}
-      toastOk('Bulk karantina dimulai: '+d.title);openJob(d.id);loadJobs();
-    });
-  });
-}
 function qAdd(p){confirmAct('Karantina file?','File akan dipindah ke gudang aman. Jika malware masih aktif, file bisa muncul lagi — gunakan Sweep.').then(function(r){
   if(!r.isConfirmed)return;
   api('/api/quarantine/add?path='+p+'&reason='+enc('dari panel'),{method:'POST'}).then(function(d){
