@@ -82,7 +82,7 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
       <li class="nav-item"><a class="nav-link" href="#" data-page="updates"><i class="bi bi-stars me-2"></i>Updates</a></li>
     </ul>
   </div>
-  <div class="p-3 border-top small text-muted">v5.0 &middot; ClamAV + ImunifyAV + rkhunter</div>
+  <div class="p-3 border-top small text-muted">v5.1 &middot; Bulk Karantina + ImunifyAV</div>
 </nav>
 
 <div id="main">
@@ -243,6 +243,18 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
       </ul>
       <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
         <button class="btn btn-outline-primary btn-sm" onclick="loadFindings()"><i class="bi bi-arrow-clockwise"></i> Muat Ulang</button>
+        <div class="btn-group">
+          <button type="button" class="btn btn-danger btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+            <i class="bi bi-archive-fill me-1"></i>Bulk Karantina
+          </button>
+          <ul class="dropdown-menu dropdown-menu-sm">
+            <li><a class="dropdown-item" href="#" onclick="qBulkAll('imunify');return false">Semua ImunifyAV</a></li>
+            <li><a class="dropdown-item" href="#" onclick="qBulkAll('backdoor');return false">Semua Backdoor</a></li>
+            <li><a class="dropdown-item" href="#" onclick="qBulkAll('malware');return false">Semua maldet/ClamAV</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item fw-semibold text-danger" href="#" onclick="qBulkAll('all');return false">Karantina Semua Temuan</a></li>
+          </ul>
+        </div>
         <select id="minscore" class="form-select form-select-sm" style="width:auto" onchange="renderFindings()">
           <option value="0">Skor: semua</option><option value="8">Skor &ge; 8</option><option value="12" selected>Skor &ge; 12</option>
         </select>
@@ -278,6 +290,7 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
           <div class="d-flex flex-wrap gap-2 mb-3">
             <button class="btn btn-primary btn-sm" onclick="runAction('imunify','')"><i class="bi bi-play-fill me-1"></i>Scan ImunifyAV</button>
             <button class="btn btn-outline-primary btn-sm" onclick="runAction('imunifysync','')"><i class="bi bi-arrow-clockwise me-1"></i>Sync Daftar</button>
+            <button class="btn btn-danger btn-sm" onclick="qBulkAll('imunify')"><i class="bi bi-archive-fill me-1"></i>Karantina Semua</button>
           </div>
           <p id="imavsummary" class="small text-muted"></p>
           <div id="imav-empty" class="empty-hint d-none">
@@ -1265,6 +1278,20 @@ function qSweepOne(p){confirmAct('Hapus file yang muncul lagi?','File ini sudah 
   });
 })}
 
+function qBulkAll(source){
+  var labels={imunify:'ImunifyAV',backdoor:'Backdoor',malware:'maldet/ClamAV',all:'SEMUA temuan'};
+  var th=$('#minscore').val()||'12';
+  var domLbl=DOMAIN==='ALL'?'semua domain':(DOMAIN.split('/')[2]||DOMAIN);
+  confirmAct('Bulk karantina '+labels[source]+'?','Job background akan mengarantina semua file '+labels[source]+' untuk '+domLbl+' yang belum dikarantina. Lihat progress di Riwayat Job.').then(function(r){
+    if(!r.isConfirmed)return;
+    var extra='&source='+enc(source)+'&threshold='+enc(th);
+    if(DOMAIN!=='ALL')extra+='&domain='+enc(DOMAIN);
+    api('/api/run/quarantine-bulk?x=1'+extra,{method:'POST'}).then(function(d){
+      if(d.error){toastErr(d.error);return;}
+      toastOk('Bulk karantina dimulai: '+d.title);openJob(d.id);loadJobs();
+    });
+  });
+}
 function qAdd(p){confirmAct('Karantina file?','File akan dipindah ke gudang aman. Jika malware masih aktif, file bisa muncul lagi — gunakan Sweep.').then(function(r){
   if(!r.isConfirmed)return;
   api('/api/quarantine/add?path='+p+'&reason='+enc('dari panel'),{method:'POST'}).then(function(d){

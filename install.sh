@@ -70,7 +70,7 @@ install -m 755 "$REPO_DIR/scripts/clamav-db-update.sh" /usr/local/bin/clamav-db-
 # --- Panel files ---
 log "Menyalin file panel ke $PANEL_DIR..."
 mkdir -p "$PANEL_DIR"/{jobs,data,quar_store}
-for f in panel.py index.html scanner.py rkscan.py aidescan.py lynisscan.py wpusers.py fileinspect.py imavscan.py; do
+for f in panel.py index.html scanner.py rkscan.py aidescan.py lynisscan.py wpusers.py fileinspect.py imavscan.py quarantine_bulk.py; do
   install -m 644 "$REPO_DIR/panel/$f" "$PANEL_DIR/$f"
 done
 install -m 755 "$REPO_DIR/scripts/synergy-scan.sh" "$PANEL_DIR/synergy-scan.sh"

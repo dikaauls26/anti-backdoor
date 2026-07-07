@@ -651,6 +651,28 @@ class Handler(BaseHTTPRequestHandler):
             jid = new_job("lynis", "Audit Keamanan (Lynis)",
                           "python3 %s/lynisscan.py audit" % BASE)
             return self._json({"id": jid, "title": "Audit Lynis"})
+        if p == "/api/run/quarantine-bulk":
+            source = g("source", "all") or "all"
+            if source not in ("imunify", "backdoor", "malware", "all"):
+                return self._json({"error": "source tidak valid"}, 400)
+            dom = g("domain", "ALL") or "ALL"
+            th = g("threshold", "12")
+            th = str(int(th)) if th.isdigit() else "12"
+            esc_dom = dom.replace("'", "'\\''")
+            label_src = {"imunify": "ImunifyAV", "backdoor": "Backdoor",
+                         "malware": "maldet", "all": "Semua"}[source]
+            label_dom = "semua" if dom == "ALL" else (
+                dom.split("/")[2] if "/home/" in dom else dom)
+            cmd = (
+                "python3 %s/quarantine_bulk.py '%s' '%s' %s"
+                % (BASE, source, esc_dom, th)
+            )
+            jid = new_job(
+                "quar-bulk",
+                "Bulk Karantina [%s / %s]" % (label_src, label_dom),
+                cmd,
+            )
+            return self._json({"id": jid, "title": "Bulk Karantina"})
         if p == "/api/quarantine/add":
             return self._json(quarantine(g("path"), g("reason")))
         if p == "/api/quarantine/restore":
