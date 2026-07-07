@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Malware Scan & Backdoor Panel (ClamAV + maldet) - v4 Bootstrap UI.
+"""Malware Scan & Backdoor Panel (ClamAV + maldet + ImunifyAV) - v5 Bootstrap UI.
 Per-domain scans, background jobs, quarantine + restore, whitelist on/off.
+ImunifyAV scan + panel karantina (karena Imunify gratis tidak auto-clean).
 Stdlib only. HTTPS + Basic Auth.
 """
 import os
@@ -234,6 +235,9 @@ def quarantine(path, reason=""):
         qm = qm_load()
         qm.append(entry)
         write_json(QM_FILE, qm)
+        # Sinkronkan dengan ImunifyAV: hapus dari malicious list setelah karantina
+        run("python3 %s/imavscan.py remove-listed '%s' 2>/dev/null" % (
+            BASE, path.replace("'", "'\\''")))
         out = {"ok": True, "id": qid, "gone": not os.path.isfile(path)}
         if warning:
             out["warning"] = warning
@@ -359,6 +363,12 @@ def get_status():
         d["lynis_score"] = None
         d["lynis_warnings"] = None
     d["lynis_scanning"] = "YES" if run("pgrep -f '[l]ynis audit' | head -1").strip() else "no"
+    im = imunify_summary()
+    d["imunify_installed"] = im.get("installed", False)
+    d["imunify_version"] = im.get("version", "")
+    d["imunify_when"] = im.get("generated")
+    d["imunify_count"] = im.get("count", 0)
+    d["imunify_scanning"] = "YES" if run("pgrep -f '[i]munify.*malware' | head -1").strip() else "no"
     return d
 
 
@@ -403,6 +413,31 @@ def fileinspect_cmd(action, path):
     return data
 
 
+def imunify_summary():
+    data = read_json(os.path.join(DATA, "imunify_latest.json"), {})
+    if not data:
+        st = run("python3 %s/imavscan.py status 2>/dev/null" % BASE).strip()
+        try:
+            info = json.loads(st)
+        except Exception:
+            info = {}
+        return {
+            "installed": info.get("installed", False),
+            "version": info.get("version", ""),
+            "generated": None,
+            "count": 0,
+            "items": [],
+        }
+    return {
+        "installed": True,
+        "version": data.get("version", ""),
+        "generated": data.get("generated"),
+        "count": data.get("count", len(data.get("items", []))),
+        "items": data.get("items", []),
+        "error": data.get("error"),
+    }
+
+
 def malware_summary():
     hits = []
     files = sorted(glob.glob(os.path.join(MALDET_SESS, "session.hits.*")),
@@ -440,8 +475,16 @@ def findings():
     rk = read_json(os.path.join(DATA, "rkhunter_latest.json"))
     aide = read_json(os.path.join(DATA, "aide_latest.json"))
     lyn = read_json(os.path.join(DATA, "lynis_latest.json"))
+    im = imunify_summary()
+    wl = wl_paths_enabled()
+    qpaths = {e["orig"] for e in qm_load()}
+    if im.get("items"):
+        for it in im["items"]:
+            p = it.get("path", "")
+            it["whitelisted"] = p in wl
+            it["quarantined"] = p in qpaths
     return {"backdoor": bd, "newfiles": nf, "malware": malware_summary(),
-            "rkhunter": rk, "aide": aide, "lynis": lyn,
+            "imunify": im, "rkhunter": rk, "aide": aide, "lynis": lyn,
             "whitelist": wl_load(), "quarantine": qm_load(),
             "quarantine_recreated": quarantine_recreated()}
 
@@ -545,6 +588,37 @@ class Handler(BaseHTTPRequestHandler):
                 label = dom.split("/")[2] if "/home/" in dom else dom
             jid = new_job("malware", "Scan Malware [%s]" % label, "maldet -a %s" % target)
             return self._json({"id": jid, "title": "Scan Malware"})
+        if p == "/api/run/imunify":
+            dom = g("domain", "ALL") or "ALL"
+            if dom == "ALL":
+                cmd = "python3 %s/imavscan.py scan-all" % BASE
+                label = "semua"
+            else:
+                esc = dom.replace("'", "'\\''")
+                cmd = "python3 %s/imavscan.py scan '%s'" % (BASE, esc)
+                label = dom.split("/")[2] if "/home/" in dom else dom
+            jid = new_job("imunify", "ImunifyAV Scan [%s]" % label, cmd)
+            return self._json({"id": jid, "title": "ImunifyAV Scan"})
+        if p == "/api/run/imunifysync":
+            jid = new_job("imunifysync", "Sync ImunifyAV Malicious List",
+                          "python3 %s/imavscan.py sync" % BASE)
+            return self._json({"id": jid, "title": "Sync ImunifyAV"})
+        if p == "/api/run/synergy":
+            dom = g("domain", "ALL") or "ALL"
+            th = g("threshold", "8")
+            th = str(int(th)) if th.isdigit() else "8"
+            if dom == "ALL":
+                cmd = (
+                    "for d in /home/*/public_html; do "
+                    "/usr/local/maldetect-panel/synergy-scan.sh \"$d\" %s; done"
+                ) % th
+                label = "semua"
+            else:
+                esc = dom.replace("'", "'\\''")
+                cmd = "/usr/local/maldetect-panel/synergy-scan.sh '%s' %s" % (esc, th)
+                label = dom.split("/")[2] if "/home/" in dom else dom
+            jid = new_job("synergy", "Scan Sinergi [%s]" % label, cmd)
+            return self._json({"id": jid, "title": "Scan Sinergi"})
         if p == "/api/run/newfiles":
             days = g("days", "3")
             days = str(int(days)) if days.isdigit() else "3"

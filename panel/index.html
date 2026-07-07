@@ -82,7 +82,7 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
       <li class="nav-item"><a class="nav-link" href="#" data-page="updates"><i class="bi bi-stars me-2"></i>Updates</a></li>
     </ul>
   </div>
-  <div class="p-3 border-top small text-muted">v4.3 &middot; ClamAV + rkhunter + AIDE + Lynis</div>
+  <div class="p-3 border-top small text-muted">v5.0 &middot; ClamAV + ImunifyAV + rkhunter</div>
 </nav>
 
 <div id="main">
@@ -142,8 +142,28 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
         <div class="col-md-6 col-xl-3">
           <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
-              <h6 class="fw-semibold"><i class="bi bi-virus text-warning me-1"></i> Scan Malware</h6>
-              <p class="small text-muted">ClamAV + maldet signature (51rb+ virus dikenal).</p>
+              <h6 class="fw-semibold"><i class="bi bi-shield-plus text-primary me-1"></i> ImunifyAV</h6>
+              <p class="small text-muted">Scan signature CloudLinux. Deteksi kuat — cleanup via tombol Karantina panel.</p>
+              <button class="btn btn-primary btn-sm w-100 mb-1" onclick="runAction('imunify','')"><i class="bi bi-play-fill"></i> Scan ImunifyAV</button>
+              <button class="btn btn-outline-primary btn-sm w-100" onclick="runAction('imunifysync','')"><i class="bi bi-arrow-clockwise"></i> Sync Temuan</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100 border-primary">
+            <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-layers text-primary me-1"></i> Scan Sinergi</h6>
+              <p class="small text-muted">ImunifyAV + maldet + ClamAV + heuristik backdoor sekaligus.</p>
+              <div class="input-group input-group-sm mb-2"><span class="input-group-text">Th</span><input type="number" id="synth" class="form-control" value="8"></div>
+              <button class="btn btn-primary btn-sm w-100" onclick="runAction('synergy','&threshold='+$('#synth').val())"><i class="bi bi-lightning-fill"></i> Scan Semua Engine</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-virus text-warning me-1"></i> maldet + ClamAV</h6>
+              <p class="small text-muted">Linux Malware Detect + ClamAV signature (51rb+).</p>
               <button class="btn btn-warning btn-sm w-100 mt-4" onclick="runAction('malware','')"><i class="bi bi-play-fill"></i> Mulai Scan</button>
             </div>
           </div>
@@ -217,7 +237,8 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
     <div class="page d-none" id="page-findings">
       <ul class="nav nav-tabs mb-3" id="findTabs">
         <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-backdoor">Backdoor <span class="badge bg-danger" id="bd-count">0</span></a></li>
-        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-malware">Malware <span class="badge bg-warning text-dark" id="mal-count">0</span></a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-imunify">ImunifyAV <span class="badge bg-primary" id="imav-count">0</span></a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-malware">maldet/ClamAV <span class="badge bg-warning text-dark" id="mal-count">0</span></a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-newfiles">File Baru <span class="badge bg-info" id="nf-count">0</span></a></li>
       </ul>
       <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
@@ -245,6 +266,27 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
           <div class="card border-0 shadow-sm" id="bd-table-wrap"><div class="card-body">
             <table id="tblBackdoor" class="table table-hover table-sm w-100"><thead><tr>
               <th>Skor</th><th>File</th><th>Indikasi</th><th>Owner</th><th>Diubah</th><th>Aksi</th>
+            </tr></thead><tbody></tbody></table>
+          </div></div>
+        </div>
+        <div class="tab-pane fade" id="tab-imunify">
+          <div class="alert alert-primary border small mb-3 py-2">
+            <i class="bi bi-shield-plus me-1"></i>
+            <strong>ImunifyAV</strong> mendeteksi malware tapi versi gratis <b>tidak bisa auto-clean/karantina</b> (dihapus sejak v6.2).
+            Gunakan tombol <b>Karantina</b> di panel ini — file dipindah aman + dihapus dari daftar Imunify.
+          </div>
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <button class="btn btn-primary btn-sm" onclick="runAction('imunify','')"><i class="bi bi-play-fill me-1"></i>Scan ImunifyAV</button>
+            <button class="btn btn-outline-primary btn-sm" onclick="runAction('imunifysync','')"><i class="bi bi-arrow-clockwise me-1"></i>Sync Daftar</button>
+          </div>
+          <p id="imavsummary" class="small text-muted"></p>
+          <div id="imav-empty" class="empty-hint d-none">
+            <i class="bi bi-shield-check d-block"></i>
+            <p class="mb-0 mt-2">Belum ada temuan ImunifyAV.<br>Jalankan <strong>Scan ImunifyAV</strong> di menu Scan atau tab ini.</p>
+          </div>
+          <div class="card border-0 shadow-sm" id="imav-table-wrap"><div class="card-body">
+            <table id="tblImunify" class="table table-hover table-sm w-100"><thead><tr>
+              <th>Signature</th><th>File</th><th>User</th><th>Status</th><th>Aksi</th>
             </tr></thead><tbody></tbody></table>
           </div></div>
         </div>
@@ -415,7 +457,9 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
         <div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#d2">Jenis Scan</button></h2>
         <div id="d2" class="accordion-collapse collapse" data-bs-parent="#docsAcc"><div class="accordion-body small">
           <p><b>Anti-Backdoor</b> — heuristik pola berbahaya di file PHP. Menangkap backdoor custom yang lolos antivirus.</p>
-          <p><b>Malware</b> — signature ClamAV + maldet (51rb+ tanda tangan).</p>
+          <p><b>ImunifyAV</b> — scan signature CloudLinux. Gratis tapi tidak bisa auto-clean (v6.2+). Temuan muncul di tab ImunifyAV → gunakan <b>Karantina</b> panel.</p>
+          <p><b>Scan Sinergi</b> — ImunifyAV + maldet + ClamAV + heuristik backdoor dalam satu job.</p>
+          <p><b>maldet + ClamAV</b> — signature 51rb+ tanda tangan virus/webshell.</p>
           <p><b>File Baru</b> — file yang berubah dalam N hari terakhir.</p>
           <p><b>Scan Sistem (rkhunter)</b> — memeriksa level OS: rootkit, backdoor kernel, binary sistem yang diubah, file/proses tersembunyi. Berlaku seluruh server, bukan per-domain. Warning berlabel <em>aman</em> = false-positive umum OpenLiteSpeed. <b>Otomatis setiap hari jam 03:00.</b></p>
           <p><b>User WordPress</b> — daftar user di dashboard (pilih domain). User mencurigakan ditandai merah/kuning. <b>Nonaktifkan</b> = turunkan ke subscriber. <b>Karantina</b> = kunci password + turunkan role.</p>
@@ -438,9 +482,9 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
     <div class="page d-none" id="page-updates">
       <div class="updates-hero mb-4">
         <div class="position-relative" style="z-index:1">
-          <span class="ver mb-2 d-inline-block"><i class="bi bi-stars me-1"></i> Panel Keamanan v4.2</span>
+          <span class="ver mb-2 d-inline-block"><i class="bi bi-stars me-1"></i> Panel Keamanan v5.0</span>
           <h4 class="fw-bold mb-2">Security Monitoring Panel</h4>
-          <p class="mb-3 opacity-90" style="max-width:620px">Panel keamanan terpusat untuk server CyberPanel + OpenLiteSpeed. Memantau malware, backdoor, rootkit, dan user WordPress mencurigakan — semua dari satu antarmuka.</p>
+          <p class="mb-3 opacity-90" style="max-width:620px">Panel keamanan terpusat: ImunifyAV scan + karantina manual, ClamAV, maldet, backdoor heuristik, rkhunter, AIDE, Lynis — saling bersinergi.</p>
           <div class="d-flex flex-wrap gap-2">
             <span class="tech-badge bg-white bg-opacity-25 border-0 text-white"><i class="bi bi-shield-check"></i> HTTPS + Auth</span>
             <span class="tech-badge bg-white bg-opacity-25 border-0 text-white"><i class="bi bi-server"></i> 16 Domain</span>
@@ -540,6 +584,24 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
               <div class="tl-dot bg-primary"></div>
               <div class="card tl-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
+                  <span class="fw-semibold">v5.0 — ImunifyAV + Karantina Sinergi</span>
+                  <span class="badge bg-primary">7 Jul 2026</span>
+                </div>
+                <div class="card-body small">
+                  <ul class="mb-0">
+                    <li>Integrasi <b>ImunifyAV</b> (gratis) — scan via CLI + sync malicious list</li>
+                    <li>Tab <b>ImunifyAV</b> di Temuan Virus dengan tombol <b>Karantina</b> (menggantikan auto-clean Imunify)</li>
+                    <li><b>Scan Sinergi</b> — ImunifyAV + maldet + ClamAV + heuristik backdoor sekaligus</li>
+                    <li>Hook <code>malware-detected</code> → auto-sync ke panel</li>
+                    <li>Cron sync Imunify setiap 15 menit</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-dot bg-primary"></div>
+              <div class="card tl-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
                   <span class="fw-semibold">v4.2 — WordPress Audit + Cron</span>
                   <span class="badge bg-primary">6 Jul 2026</span>
                 </div>
@@ -630,7 +692,8 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
           <h6 class="fw-semibold mb-3"><i class="bi bi-tools text-primary me-2"></i>Teknologi</h6>
           <div class="card border-0 shadow-sm mb-3"><div class="card-body">
             <div class="d-flex flex-wrap gap-1 mb-3">
-              <span class="tech-badge"><i class="bi bi-shield text-primary"></i> ClamAV 0.103</span>
+              <span class="tech-badge"><i class="bi bi-shield-plus text-primary"></i> ImunifyAV</span>
+              <span class="tech-badge"><i class="bi bi-shield text-primary"></i> ClamAV</span>
               <span class="tech-badge"><i class="bi bi-bug text-warning"></i> maldet 1.6.6</span>
               <span class="tech-badge"><i class="bi bi-hdd-network text-info"></i> rkhunter 1.4.6</span>
               <span class="tech-badge"><i class="bi bi-bootstrap text-primary"></i> Bootstrap 5.3</span>
@@ -861,6 +924,7 @@ function loadStatus(){api('/api/status').then(function(d){
   var mal=d.malware||{},mn=(mal.hits||[]).length;
   var cards=[
     {t:'Status Scan',v:d.scan_running==='YES'?'<span class="text-warning">Scanning...</span>':'<span class="text-success">Idle</span>',i:'bi-activity',c:'primary'},
+    {t:'ImunifyAV',v:d.imunify_count==null?'-':d.imunify_count,v2:(d.imunify_count>0?'text-danger':'text-success'),i:'bi-shield-plus',c:'primary',sub:d.imunify_when?d.imunify_when.substring(0,16):(d.imunify_installed?'terpasang':'belum')},
     {t:'Malware',v:mn,v2:mn>0?'text-danger':'text-success',i:'bi-virus',c:'danger'},
     {t:'Backdoor',v:d.backdoor_flagged==null?'-':d.backdoor_flagged,v2:(d.backdoor_flagged>0?'text-danger':'text-success'),i:'bi-code-slash',c:'warning'},
     {t:'Rootkit',v:d.rkhunter_warnings==null?'-':d.rkhunter_warnings,v2:(d.rkhunter_warnings>0?'text-danger':'text-success'),i:'bi-hdd-network',c:'primary',sub:d.rkhunter_when?d.rkhunter_when.substring(0,10):'belum'},
@@ -955,7 +1019,7 @@ function renderFindings(){
   toggleEmpty('bd-table-wrap','bd-empty',bitems.length>0);
 
   var mh=mal.hits||[];$('#mal-count').text(mh.length);
-  $('#malsummary').text(mal.summary||'Belum ada scan malware.');
+  $('#malsummary').text(mal.summary||'Belum ada scan maldet/ClamAV.');
   var malrows=mh.map(function(h){
     var ep=enc(h.path);
     return [esc(h.sig),fileLink(h.path,ep,''),
@@ -963,6 +1027,8 @@ function renderFindings(){
   });
   initDT('tblMalware',{data:malrows,columnDefs:[{targets:-1,orderable:false}]});
   toggleEmpty('mal-table-wrap','mal-empty',mh.length>0);
+
+  renderImunify(FIND.imunify||{});
 
   var nfitems=(nf&&nf.items)?nf.items:[];
   $('#nf-count').text(nfitems.length);
@@ -1000,6 +1066,27 @@ function renderFindings(){
   initDT('tblWl',{data:wlrows});
 
   renderRk();renderAide();renderLynis();
+}
+
+function renderImunify(im){
+  var items=(im&&im.items)?im.items:[];
+  $('#imav-count').text(items.length);
+  var meta='';
+  if(im.version)meta+=im.version+' · ';
+  meta+=(im.generated||'belum sync')+' · '+items.length+' file';
+  if(im.error)meta+=' · <span class="text-danger">'+esc(im.error)+'</span>';
+  $('#imavsummary').html(meta);
+  var rows=items.map(function(it){
+    var ep=enc(it.path);
+    var st=it.quarantined?'<span class="badge bg-warning">Dikarantina</span>':(it.whitelisted?'<span class="badge bg-success">WL</span>':'<span class="badge bg-danger">Aktif</span>');
+    var act='';
+    if(it.quarantined)act='<span class="text-muted small">Sudah dikarantina</span>';
+    else if(it.whitelisted)act=btnCabutWl(ep);
+    else act=btnDetail(ep)+btnKarantina(ep)+btnWhitelist(ep);
+    return [esc(it.signature||'ImunifyAV'),fileLink(it.path,ep,''),esc(it.user||'-'),st,act];
+  });
+  initDT('tblImunify',{data:rows,columnDefs:[{targets:-1,orderable:false}]});
+  toggleEmpty('imav-table-wrap','imav-empty',items.length>0);
 }
 
 function rkSevBadge(s){var m={tinggi:'danger',sedang:'warning',rendah:'secondary'};

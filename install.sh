@@ -70,9 +70,10 @@ install -m 755 "$REPO_DIR/scripts/clamav-db-update.sh" /usr/local/bin/clamav-db-
 # --- Panel files ---
 log "Menyalin file panel ke $PANEL_DIR..."
 mkdir -p "$PANEL_DIR"/{jobs,data,quar_store}
-for f in panel.py index.html scanner.py rkscan.py aidescan.py lynisscan.py wpusers.py fileinspect.py; do
+for f in panel.py index.html scanner.py rkscan.py aidescan.py lynisscan.py wpusers.py fileinspect.py imavscan.py; do
   install -m 644 "$REPO_DIR/panel/$f" "$PANEL_DIR/$f"
 done
+install -m 755 "$REPO_DIR/scripts/synergy-scan.sh" "$PANEL_DIR/synergy-scan.sh"
 
 # Credentials
 ADMIN_USER="scanadmin"
@@ -99,9 +100,13 @@ if [[ ! -f "$PANEL_DIR/panel.pem" ]]; then
 fi
 
 # Cron scripts
-for c in cron-rkhunter.sh cron-aide.sh cron-lynis.sh; do
+for c in cron-rkhunter.sh cron-aide.sh cron-lynis.sh cron-imunify-sync.sh; do
     install -m 755 "$REPO_DIR/scripts/$c" "$PANEL_DIR/$c"
 done
+
+# --- ImunifyAV (gratis) + hook ke panel karantina ---
+log "Menginstal ImunifyAV..."
+bash "$REPO_DIR/scripts/install-imunify.sh" >>"$LOG" 2>&1 || log "Peringatan: ImunifyAV gagal — bisa jalankan ulang scripts/install-imunify.sh"
 
 # systemd
 install -m 644 "$REPO_DIR/systemd/scanpanel.service" /etc/systemd/system/scanpanel.service
@@ -116,6 +121,7 @@ CRON_MARKER="# anti-backdoor-panel"
 0 4 * * * $PANEL_DIR/cron-aide.sh $CRON_MARKER
 0 5 * * 0 $PANEL_DIR/cron-lynis.sh $CRON_MARKER
 0 6 * * * /usr/local/bin/clamav-db-update.sh $CRON_MARKER
+*/15 * * * * $PANEL_DIR/cron-imunify-sync.sh $CRON_MARKER
 CRON
 ) | crontab -
 

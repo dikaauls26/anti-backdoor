@@ -1,11 +1,13 @@
 # Anti-Backdoor Security Panel
 
-Panel keamanan web untuk server Linux (Ubuntu/Debian) dengan CyberPanel, OpenLiteSpeed, atau stack serupa. Menggabungkan scan malware website, deteksi backdoor heuristik, karantina, audit user WordPress, dan scan sistem (rkhunter, AIDE, Lynis).
+Panel keamanan web untuk server Linux (Ubuntu/Debian) dengan CyberPanel, OpenLiteSpeed, atau stack serupa. Menggabungkan **ImunifyAV**, ClamAV, maldet, scan malware website, deteksi backdoor heuristik, **karantina manual** (menggantikan auto-clean Imunify gratis), audit user WordPress, dan scan sistem (rkhunter, AIDE, Lynis).
 
 ## Fitur
 
+- **ImunifyAV** — scan signature CloudLinux; temuan + tombol **Karantina** di panel (karena Imunify gratis tidak auto-clean sejak v6.2)
+- **Scan Sinergi** — ImunifyAV + maldet + ClamAV + heuristik backdoor dalam satu job
 - **Scan website** — heuristik backdoor (`scanner.py`), ClamAV, maldet, deteksi file baru
-- **Karantina & restore** — isolasi file mencurigakan + sweep ulang
+- **Karantina & restore** — isolasi file mencurigakan + sweep ulang + sync Imunify malicious list
 - **Whitelist** — abaikan false positive
 - **Audit user WordPress** — deteksi akun admin mencurigakan
 - **Scan sistem** — rkhunter (rootkit), AIDE (integritas file), Lynis (hardening)
@@ -27,11 +29,12 @@ sudo bash install.sh
 
 Installer akan:
 
-1. Memasang ClamAV, maldet, rkhunter, AIDE, Lynis, dan dependensi
+1. Memasang ClamAV, maldet, rkhunter, AIDE, Lynis, **ImunifyAV**, dan dependensi
 2. Mengatur update signature ClamAV via `cvdupdate`
-3. Menyalin panel ke `/usr/local/maldetect-panel/`
-4. Membuat kredensial acak + sertifikat SSL self-signed
-5. Mendaftarkan service `scanpanel` (systemd) dan cron harian
+3. Mendaftarkan hook ImunifyAV → panel karantina
+4. Menyalin panel ke `/usr/local/maldetect-panel/`
+5. Membuat kredensial acak + sertifikat SSL self-signed
+6. Mendaftarkan service `scanpanel` (systemd) dan cron harian + sync Imunify 15 menit
 
 Setelah selesai, buka `https://<IP-SERVER>:9793` di browser.
 
@@ -40,21 +43,19 @@ Setelah selesai, buka `https://<IP-SERVER>:9793` di browser.
 ```
 anti-backdoor/
 ├── install.sh              # Installer utama
+├── NOTES.md                # Dokumentasi arsitektur mixing antivirus
 ├── panel/
 │   ├── panel.py            # Backend API + HTTPS server
+│   ├── imavscan.py         # Bridge ImunifyAV ↔ karantina panel
 │   ├── index.html          # UI panel
-│   ├── scanner.py          # Heuristik backdoor
-│   ├── rkscan.py           # Parser rkhunter
-│   ├── aidescan.py         # Parser AIDE
-│   ├── lynisscan.py        # Parser Lynis
-│   ├── wpusers.py          # Audit user WordPress
-│   ├── fileinspect.py      # Detail file + probe URL
-│   └── panel.conf.example  # Contoh konfigurasi
+│   └── ...
+├── hooks/
+│   └── malware_detected.py # Hook ImunifyAV real-time
 ├── scripts/
-│   ├── clamav-db-update.sh
-│   ├── cron-rkhunter.sh
-│   ├── cron-aide.sh
-│   └── cron-lynis.sh
+│   ├── install-imunify.sh  # Pasang ImunifyAV + hook
+│   ├── synergy-scan.sh     # Scan semua engine sekaligus
+│   ├── cron-imunify-sync.sh
+│   └── ...
 └── systemd/
     └── scanpanel.service
 ```
@@ -108,6 +109,9 @@ python3 /usr/local/maldetect-panel/lynisscan.py audit
 | 04:00 harian | AIDE |
 | 05:00 Minggu | Lynis |
 | 06:00 harian | Update ClamAV DB |
+| Setiap 15 menit | Sync ImunifyAV malicious list |
+
+Lihat [NOTES.md](NOTES.md) untuk arsitektur mixing ImunifyAV + karantina panel.
 
 ## Keamanan
 
