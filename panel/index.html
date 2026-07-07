@@ -78,11 +78,12 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
       <li class="nav-item"><a class="nav-link" href="#" data-page="quar"><i class="bi bi-archive me-2"></i>Karantina</a></li>
       <li class="nav-item"><a class="nav-link" href="#" data-page="whitelist"><i class="bi bi-check-circle me-2"></i>Whitelist</a></li>
       <li class="nav-item"><a class="nav-link" href="#" data-page="jobs"><i class="bi bi-clock-history me-2"></i>Riwayat Job</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" data-page="system-info"><i class="bi bi-cpu me-2"></i>Sistem &amp; Server</a></li>
       <li class="nav-item"><a class="nav-link" href="#" data-page="docs"><i class="bi bi-book me-2"></i>Bantuan</a></li>
       <li class="nav-item"><a class="nav-link" href="#" data-page="updates"><i class="bi bi-stars me-2"></i>Updates</a></li>
     </ul>
   </div>
-  <div class="p-3 border-top small text-muted">v5.2 &middot; Checkbox Karantina + WP Core</div>
+  <div class="p-3 border-top small text-muted">v5.3 &middot; Sistem &amp; Kontrol Server</div>
 </nav>
 
 <div id="main">
@@ -485,6 +486,85 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
       </div>
     </div>
 
+    <!-- SYSTEM & SERVER -->
+    <div class="page d-none" id="page-system-info">
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <button class="btn btn-outline-primary btn-sm" onclick="loadSysinfo()"><i class="bi bi-arrow-clockwise me-1"></i>Muat Ulang</button>
+      </div>
+
+      <!-- Rekomendasi spesifikasi -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold"><i class="bi bi-clipboard-data text-primary me-2"></i>Spesifikasi Instalasi &amp; Rekomendasi Scan</div>
+        <div class="card-body">
+          <div class="alert alert-light border small mb-3">
+            <i class="bi bi-info-circle text-primary me-1"></i>
+            Panel &amp; scanner ringan (stdlib Python). Beban terbesar saat <b>ImunifyAV / maldet / ClamAV</b> memindai file.
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th>Skala</th><th>RAM</th><th>Disk kosong</th><th>CPU</th><th>Catatan</th></tr></thead>
+              <tbody>
+                <tr><td><b>Minimal</b></td><td>2 GB</td><td>5 GB</td><td>1 vCPU</td><td>Scan 1 domain kecil, agak lambat. ClamAV DB ~1 GB RAM saat load.</td></tr>
+                <tr class="table-success"><td><b>Optimal</b> (disarankan)</td><td>4 GB</td><td>10 GB</td><td>2 vCPU</td><td>Scan multi-domain lancar, ImunifyAV + maldet paralel aman.</td></tr>
+                <tr><td><b>Ideal</b> (banyak domain)</td><td>8 GB</td><td>20 GB+</td><td>4 vCPU</td><td>16+ domain, scan sinergi cepat, karantina besar.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="small text-muted mt-2 mb-0">Disk dipakai: ClamAV signature ~1 GB, gudang karantina tumbuh sesuai file diisolasi, log scan. Sisakan &ge;15% disk agar scan tidak gagal.</p>
+        </div>
+      </div>
+
+      <!-- Status resource live -->
+      <div class="row g-3 mb-4" id="sysResourceCards">
+        <div class="col-12 text-center py-4"><div class="spinner-border text-primary"></div></div>
+      </div>
+
+      <!-- Detail server -->
+      <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white fw-semibold"><i class="bi bi-hdd-stack text-primary me-2"></i>Detail Server</div>
+            <div class="card-body"><table class="table table-sm mb-0" id="sysDetailTbl"><tbody></tbody></table></div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white fw-semibold"><i class="bi bi-hdd text-primary me-2"></i>Pemakaian Penyimpanan</div>
+            <div class="card-body"><table class="table table-sm mb-0" id="sysDiskTbl"><tbody></tbody></table></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kontrol service -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white d-flex flex-wrap align-items-center gap-2">
+          <span class="fw-semibold"><i class="bi bi-toggles text-primary me-2"></i>Kontrol Service</span>
+          <button class="btn btn-warning btn-sm ms-auto" onclick="restartWebStack()"><i class="bi bi-arrow-repeat me-1"></i>Restart Web Stack (lsws + lscpd)</button>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-warning small mb-3 py-2">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Restart service akan memutus koneksi sesaat (website/panel bisa down beberapa detik).
+          </div>
+          <table id="tblServices" class="table table-hover table-sm w-100"><thead><tr>
+            <th>Service</th><th>Unit</th><th>Status</th><th>Autostart</th><th>Aksi</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+
+      <!-- Zona bahaya -->
+      <div class="card border-danger shadow-sm mb-4">
+        <div class="card-header bg-danger text-white fw-semibold"><i class="bi bi-exclamation-octagon me-2"></i>Zona Bahaya</div>
+        <div class="card-body d-flex flex-wrap align-items-center gap-3">
+          <div class="flex-grow-1">
+            <b>Reboot Server</b>
+            <div class="small text-muted">Restart seluruh server. Semua website &amp; layanan down 1-3 menit sampai boot selesai.</div>
+          </div>
+          <button class="btn btn-danger" onclick="rebootServer()"><i class="bi bi-power me-1"></i>Reboot Server Sekarang</button>
+        </div>
+      </div>
+    </div>
+
     <!-- DOCS -->
     <div class="page d-none" id="page-docs">
       <div class="accordion" id="docsAcc">
@@ -618,6 +698,39 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
         <div class="col-lg-7">
           <h6 class="fw-semibold mb-3"><i class="bi bi-clock-history text-primary me-2"></i>Riwayat Update</h6>
           <div class="timeline">
+            <div class="tl-item">
+              <div class="tl-dot bg-primary"></div>
+              <div class="card tl-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <span class="fw-semibold">v5.3 — Sistem &amp; Kontrol Server</span>
+                  <span class="badge bg-primary">7 Jul 2026</span>
+                </div>
+                <div class="card-body small">
+                  <ul class="mb-0">
+                    <li>Halaman <b>Sistem &amp; Server</b> di sidebar — spesifikasi instalasi &amp; rekomendasi RAM/disk untuk scan optimal</li>
+                    <li>Monitor resource live: RAM, disk, CPU, load, pemakaian karantina &amp; DB ClamAV</li>
+                    <li>Tombol <b>Restart Service</b> (lsws, lscpd, MariaDB, dll.) dengan konfirmasi</li>
+                    <li>Tombol <b>Restart Web Stack</b> (lsws + lscpd sekaligus)</li>
+                    <li>Tombol <b>Reboot Server</b> dengan konfirmasi ketik <code>REBOOT</code></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-dot bg-primary"></div>
+              <div class="card tl-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <span class="fw-semibold">v5.2 — Checkbox Karantina + WP Core Check</span>
+                  <span class="badge bg-primary">7 Jul 2026</span>
+                </div>
+                <div class="card-body small">
+                  <ul class="mb-0">
+                    <li>Karantina via <b>checkbox</b> per file (bukan bulk semua) — lebih aman untuk file bawaan WP</li>
+                    <li>Tab <b>WP Aneh</b> — deteksi file asing/termodifikasi di <code>wp-includes</code> &amp; <code>wp-admin</code> via checksum resmi WordPress.org</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
             <div class="tl-item">
               <div class="tl-dot bg-primary"></div>
               <div class="card tl-card">
@@ -828,7 +941,7 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
 var DOMAIN='ALL',FIND=null,curJob=null,jobTimer=null,WPUSERS=null,FD_PATH='',fdModal=null;
 var SEL_PATHS=new Set();
 var dtLang={search:'Cari:',lengthMenu:'Tampilkan _MENU_ data',info:'_START_-_END_ dari _TOTAL_',paginate:{previous:'&laquo;',next:'&raquo;'},emptyTable:'Tidak ada data',zeroRecords:'Tidak ditemukan'};
-var titles={dash:'Dashboard',scan:'Scan',findings:'Temuan Virus',system:'Scan Sistem',quar:'Karantina',whitelist:'Whitelist',jobs:'Riwayat Job',docs:'Bantuan',updates:'Updates'};
+var titles={dash:'Dashboard',scan:'Scan',findings:'Temuan Virus',system:'Scan Sistem',quar:'Karantina',whitelist:'Whitelist',jobs:'Riwayat Job','system-info':'Sistem & Server',docs:'Bantuan',updates:'Updates'};
 var dts={},jobsBusy=false;
 
 function api(p,o){return fetch(p,Object.assign({credentials:'same-origin'},o||{})).then(r=>r.json())}
@@ -913,6 +1026,7 @@ $('.nav-link[data-page]').on('click',function(e){e.preventDefault();
   if(p==='system')loadFindings();
   if(p==='quar'||p==='whitelist')loadFindings();
   if(p==='jobs')loadJobs();
+  if(p==='system-info')loadSysinfo();
 });
 
 $('#btnToggleSidebar').on('click',function(){$('#sidebar').toggleClass('show')});
@@ -1041,6 +1155,102 @@ function loadJobs(){if(jobsBusy)return;jobsBusy=true;
       return '<div class="alert alert-warning py-2 mb-2 small cursor-pointer" onclick="openJob(\''+j.id+'\')">'+statusBadge(j.status)+' <b>'+esc(j.title)+'</b> — '+esc(j.last)+'</div>';
     }).join(''):'<span class="text-muted">Tidak ada job berjalan.</span>');
   }).finally(function(){jobsBusy=false});
+}
+
+// ---------- Sistem & Server ----------
+function pctBar(pct,warnAt,dangerAt){
+  var cls=pct>=dangerAt?'bg-danger':(pct>=warnAt?'bg-warning':'bg-success');
+  return '<div class="progress" style="height:8px"><div class="progress-bar '+cls+'" style="width:'+Math.min(pct,100)+'%"></div></div>';
+}
+function loadSysinfo(){
+  $('#sysResourceCards').html('<div class="col-12 text-center py-4"><div class="spinner-border text-primary"></div></div>');
+  api('/api/sysinfo').then(function(d){
+    var memT=parseInt(d.mem_total_mb||0),memU=parseInt(d.mem_used_mb||0),memA=parseInt(d.mem_avail_mb||0);
+    var memPct=memT?Math.round(memU*100/memT):0;
+    var diskPct=parseInt((d.disk_pct||'0').replace('%',''))||0;
+    var memGb=(memT/1024).toFixed(1);
+    var ramStatus=memT>=7600?'<span class="badge bg-success">Ideal</span>':memT>=3600?'<span class="badge bg-success">Optimal</span>':memT>=1800?'<span class="badge bg-warning text-dark">Minimal</span>':'<span class="badge bg-danger">Kurang</span>';
+    var cores=parseInt(d.cpu_cores||1);
+    var cpuStatus=cores>=4?'<span class="badge bg-success">Ideal</span>':cores>=2?'<span class="badge bg-success">Optimal</span>':'<span class="badge bg-warning text-dark">Minimal</span>';
+    var diskStatus=diskPct<70?'<span class="badge bg-success">Aman</span>':diskPct<85?'<span class="badge bg-warning text-dark">Perhatian</span>':'<span class="badge bg-danger">Kritis</span>';
+    $('#sysResourceCards').html(
+      '<div class="col-md-4"><div class="card border-0 shadow-sm h-100"><div class="card-body">'
+      +'<div class="d-flex justify-content-between"><span class="text-muted small">RAM</span>'+ramStatus+'</div>'
+      +'<div class="fs-5 fw-semibold">'+memU+' / '+memT+' MB <span class="text-muted small">('+memGb+' GB total)</span></div>'
+      +pctBar(memPct,75,90)
+      +'<div class="small text-muted mt-1">Tersedia '+memA+' MB &middot; Swap '+esc(d.swap_used_mb)+'/'+esc(d.swap_total_mb)+' MB</div>'
+      +'</div></div></div>'
+      +'<div class="col-md-4"><div class="card border-0 shadow-sm h-100"><div class="card-body">'
+      +'<div class="d-flex justify-content-between"><span class="text-muted small">DISK /</span>'+diskStatus+'</div>'
+      +'<div class="fs-5 fw-semibold">'+esc(d.disk_used)+' / '+esc(d.disk_total)+' <span class="text-muted small">('+esc(d.disk_pct)+')</span></div>'
+      +pctBar(diskPct,70,85)
+      +'<div class="small text-muted mt-1">Kosong '+esc(d.disk_avail)+' &middot; /home '+esc(d.home_used||'-')+'</div>'
+      +'</div></div></div>'
+      +'<div class="col-md-4"><div class="card border-0 shadow-sm h-100"><div class="card-body">'
+      +'<div class="d-flex justify-content-between"><span class="text-muted small">CPU</span>'+cpuStatus+'</div>'
+      +'<div class="fs-5 fw-semibold">'+cores+' core</div>'
+      +'<div class="small text-muted mt-1">Load: '+esc(d.load)+'</div>'
+      +'<div class="small text-muted">'+esc(d.cpu_model)+'</div>'
+      +'</div></div></div>');
+    $('#sysDetailTbl tbody').html(
+      '<tr><td class="text-muted">Hostname</td><td>'+esc(d.hostname)+'</td></tr>'
+      +'<tr><td class="text-muted">OS</td><td>'+esc(d.os)+'</td></tr>'
+      +'<tr><td class="text-muted">Kernel</td><td>'+esc(d.kernel)+'</td></tr>'
+      +'<tr><td class="text-muted">Uptime</td><td>'+esc(d.uptime)+'</td></tr>');
+    $('#sysDiskTbl tbody').html(
+      '<tr><td class="text-muted">Data website (/home)</td><td>'+esc(d.home_used||'-')+'</td></tr>'
+      +'<tr><td class="text-muted">Gudang karantina</td><td>'+esc(d.quar_store_size||'-')+'</td></tr>'
+      +'<tr><td class="text-muted">Database ClamAV</td><td>'+esc(d.clamdb_size||'-')+'</td></tr>'
+      +'<tr><td class="text-muted">Disk kosong</td><td>'+esc(d.disk_avail)+'</td></tr>');
+    var rows=(d.services||[]).map(function(s){
+      var st=s.active==='active'?'<span class="badge bg-success">aktif</span>':s.active==='inactive'?'<span class="badge bg-secondary">mati</span>':s.active==='failed'?'<span class="badge bg-danger">gagal</span>':'<span class="badge bg-light text-dark border">'+esc(s.active)+'</span>';
+      var en=s.enabled==='enabled'?'<span class="badge bg-light text-success border">ya</span>':'<span class="badge bg-light text-muted border">'+esc(s.enabled)+'</span>';
+      var self=s.key==='scanpanel';
+      return '<tr><td><b>'+esc(s.label)+'</b></td><td><code>'+esc(s.unit)+'</code></td><td>'+st+'</td><td>'+en+'</td>'
+        +'<td><button class="btn btn-outline-warning btn-sm" onclick="svcRestart(\''+s.key+'\',\''+esc(s.label)+'\','+self+')"><i class="bi bi-arrow-repeat me-1"></i>Restart</button></td></tr>';
+    }).join('');
+    $('#tblServices tbody').html(rows);
+  }).catch(function(){toastErr('Gagal memuat info sistem')});
+}
+function svcRestart(key,label,self){
+  var extra=self?' Panel ini juga akan restart — halaman akan terputus sebentar, refresh setelah ±5 detik.':'';
+  confirmAct('Restart '+label+'?','Service akan di-restart, koneksi terputus sesaat.'+extra).then(function(r){
+    if(!r.isConfirmed)return;
+    api('/api/service/action?service='+enc(key)+'&action=restart',{method:'POST'}).then(function(d){
+      if(d.error)return toastErr(d.error);
+      toastOk('Restart '+label+' — status: '+(d.active||'?'));
+      setTimeout(loadSysinfo,1500);
+    }).catch(function(){
+      if(self){toastOk('Panel sedang restart, refresh halaman dalam beberapa detik');}
+      else toastErr('Gagal menghubungi server');
+    });
+  });
+}
+function restartWebStack(){
+  confirmAct('Restart Web Stack?','lsws (OpenLiteSpeed) dan lscpd (CyberPanel) akan di-restart. Semua website down beberapa detik.').then(function(r){
+    if(!r.isConfirmed)return;
+    api('/api/service/restart-web',{method:'POST'}).then(function(d){
+      if(d.error)return toastErr(d.error);
+      toastOk('Web stack di-restart');
+      setTimeout(loadSysinfo,2000);
+    });
+  });
+}
+function rebootServer(){
+  Swal.fire({
+    title:'Reboot Server?',
+    html:'<b class="text-danger">SEMUA website & layanan akan down 1-3 menit.</b><br><br>Ketik <code>REBOOT</code> untuk konfirmasi:',
+    icon:'warning',input:'text',inputPlaceholder:'REBOOT',
+    showCancelButton:true,confirmButtonText:'Reboot Sekarang',cancelButtonText:'Batal',confirmButtonColor:'#dc3545',
+    preConfirm:function(v){if(v!=='REBOOT'){Swal.showValidationMessage('Ketik REBOOT (huruf besar) untuk lanjut');return false}return true}
+  }).then(function(r){
+    if(!r.isConfirmed)return;
+    api('/api/system/reboot',{method:'POST'}).then(function(d){
+      Swal.fire({icon:'info',title:'Server sedang reboot',html:'Tunggu 1-3 menit lalu refresh halaman ini.',timer:8000});
+    }).catch(function(){
+      Swal.fire({icon:'info',title:'Server sedang reboot',html:'Koneksi terputus — server sedang restart. Tunggu 1-3 menit.'});
+    });
+  });
 }
 
 function openJob(id){curJob=id;

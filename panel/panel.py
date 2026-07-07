@@ -502,6 +502,104 @@ def findings():
             "quarantine_recreated": quarantine_recreated()}
 
 
+# ---------- system info & service control ----------
+# Service yang boleh dikontrol dari panel (whitelist, hindari command injection).
+MANAGED_SERVICES = {
+    "lsws": {"label": "OpenLiteSpeed (lsws)", "unit": "lsws"},
+    "lscpd": {"label": "CyberPanel (lscpd)", "unit": "lscpd"},
+    "mariadb": {"label": "MariaDB / MySQL", "unit": "mariadb"},
+    "pdns": {"label": "PowerDNS", "unit": "pdns"},
+    "pure-ftpd": {"label": "Pure-FTPd", "unit": "pure-ftpd"},
+    "postfix": {"label": "Postfix (mail)", "unit": "postfix"},
+    "dovecot": {"label": "Dovecot (IMAP/POP)", "unit": "dovecot"},
+    "redis": {"label": "Redis", "unit": "redis"},
+    "scanpanel": {"label": "Security Panel", "unit": "scanpanel"},
+}
+# unit alternatif per service (nama unit beda antar distro)
+SERVICE_UNIT_ALIASES = {
+    "mariadb": ["mariadb", "mysql", "mysqld"],
+    "redis": ["redis", "redis-server"],
+    "pdns": ["pdns", "pdns-server"],
+    "pure-ftpd": ["pure-ftpd", "pure-ftpd-mysql"],
+}
+
+
+def _resolve_unit(key):
+    for unit in SERVICE_UNIT_ALIASES.get(key, [MANAGED_SERVICES[key]["unit"]]):
+        rc = subprocess.run(
+            "systemctl list-unit-files '%s.service' 2>/dev/null | grep -q '%s'" % (unit, unit),
+            shell=True,
+        ).returncode
+        if rc == 0:
+            return unit
+    return MANAGED_SERVICES[key]["unit"]
+
+
+def service_status_all():
+    out = []
+    for key, meta in MANAGED_SERVICES.items():
+        unit = _resolve_unit(key)
+        active = run("systemctl is-active %s 2>/dev/null" % unit).strip()
+        enabled = run("systemctl is-enabled %s 2>/dev/null" % unit).strip()
+        out.append({
+            "key": key,
+            "label": meta["label"],
+            "unit": unit,
+            "active": active or "unknown",
+            "enabled": enabled or "unknown",
+        })
+    return out
+
+
+def service_action(key, action):
+    if key not in MANAGED_SERVICES:
+        return {"error": "service tidak dikenal"}
+    if action not in ("restart", "start", "stop"):
+        return {"error": "aksi tidak valid"}
+    unit = _resolve_unit(key)
+    out = run("systemctl %s %s 2>&1" % (action, unit), timeout=90)
+    active = run("systemctl is-active %s 2>/dev/null" % unit).strip()
+    return {"ok": True, "unit": unit, "action": action,
+            "active": active, "output": out.strip()[:500]}
+
+
+def restart_web_stack():
+    """Restart service web utama: lsws + lscpd (dan mariadb kalau ada)."""
+    results = []
+    for key in ("lsws", "lscpd"):
+        results.append(service_action(key, "restart"))
+    return {"ok": True, "results": results}
+
+
+def sysinfo():
+    d = {}
+    d["hostname"] = run("hostname").strip()
+    d["os"] = run("grep PRETTY_NAME /etc/os-release | cut -d'\"' -f2").strip()
+    d["kernel"] = run("uname -r").strip()
+    d["uptime"] = run("uptime -p 2>/dev/null").strip()
+    d["cpu_model"] = run("grep -m1 'model name' /proc/cpuinfo | cut -d: -f2").strip()
+    d["cpu_cores"] = run("nproc").strip()
+    d["load"] = run("cat /proc/loadavg | awk '{print $1\", \"$2\", \"$3}'").strip()
+    # RAM (MB)
+    d["mem_total_mb"] = run("free -m | awk '/Mem/{print $2}'").strip()
+    d["mem_used_mb"] = run("free -m | awk '/Mem/{print $3}'").strip()
+    d["mem_avail_mb"] = run("free -m | awk '/Mem/{print $7}'").strip()
+    d["swap_total_mb"] = run("free -m | awk '/Swap/{print $2}'").strip()
+    d["swap_used_mb"] = run("free -m | awk '/Swap/{print $3}'").strip()
+    # Disk root
+    d["disk_total"] = run("df -h / | awk 'NR==2{print $2}'").strip()
+    d["disk_used"] = run("df -h / | awk 'NR==2{print $3}'").strip()
+    d["disk_avail"] = run("df -h / | awk 'NR==2{print $4}'").strip()
+    d["disk_pct"] = run("df -h / | awk 'NR==2{print $5}'").strip()
+    # /home usage (data website)
+    d["home_used"] = run("du -sh /home 2>/dev/null | awk '{print $1}'").strip()
+    # Karantina store
+    d["quar_store_size"] = run("du -sh %s 2>/dev/null | awk '{print $1}'" % QSTORE).strip()
+    d["clamdb_size"] = run("du -sh /var/lib/clamav 2>/dev/null | awk '{print $1}'").strip()
+    d["services"] = service_status_all()
+    return d
+
+
 # ---------- HTML (loaded from index.html) ----------
 def load_page():
     path = os.path.join(BASE, "index.html")
@@ -562,6 +660,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(job_detail(parse_qs(u.query).get("id", [""])[0]) or {"error": "not found"})
         if p == "/api/findings":
             return self._json(findings())
+        if p == "/api/sysinfo":
+            return self._json(sysinfo())
         if p == "/api/wpusers":
             dom = parse_qs(u.query).get("domain", [cfg["DOMAIN_PATH"]])[0]
             return self._json(wpusers_cmd("list", dom))
@@ -736,6 +836,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(wpusers_cmd("deactivate", g("domain", cfg["DOMAIN_PATH"]), g("id")))
         if p == "/api/wpuser/quarantine":
             return self._json(wpusers_cmd("quarantine", g("domain", cfg["DOMAIN_PATH"]), g("id")))
+        if p == "/api/service/action":
+            return self._json(service_action(g("service"), g("action", "restart")))
+        if p == "/api/service/restart-web":
+            return self._json(restart_web_stack())
+        if p == "/api/system/reboot":
+            # reboot ditunda 3 detik agar respons HTTP sempat terkirim
+            subprocess.Popen(
+                ["bash", "-c", "sleep 3; systemctl reboot"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL, start_new_session=True,
+            )
+            return self._json({"ok": True, "message": "Server akan reboot dalam 3 detik"})
         return self._json({"error": "aksi tidak dikenal"}, 404)
 
 
