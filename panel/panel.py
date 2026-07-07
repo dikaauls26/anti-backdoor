@@ -13,6 +13,8 @@ import time
 import glob
 import shutil
 import pwd
+import re
+import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -46,6 +48,8 @@ except FileNotFoundError:
 USERNAME = cfg["USERNAME"]
 PASSWORD = cfg["PASSWORD"]
 PORT = int(cfg["PORT"])
+SESSION_TTL = 60 * 60 * 12  # 12 jam
+SESSIONS = {}
 
 for d in (JOBS, DATA, QSTORE):
     os.makedirs(d, exist_ok=True)
@@ -502,6 +506,115 @@ def findings():
             "quarantine_recreated": quarantine_recreated()}
 
 
+def classify_overall(find):
+    wp_items = (find.get("wpcore") or {}).get("items", [])
+    extra_wp = len([i for i in wp_items if i.get("kind") == "extra_file"])
+    mod_wp = len([i for i in wp_items if i.get("kind") == "modified_core"])
+    malware_hits = len((find.get("malware") or {}).get("hits", []))
+    im_hits = len((find.get("imunify") or {}).get("items", []))
+    bd_hits = len((find.get("backdoor") or {}).get("items", [])) if find.get("backdoor") else 0
+    score = (bd_hits * 4) + (malware_hits * 3) + (im_hits * 2) + (extra_wp * 2) + mod_wp
+    if score == 0:
+        return "AMAN"
+    if score <= 5:
+        return "PERLU TINJAU"
+    return "TIDAK AMAN"
+
+
+def report_summary():
+    st = get_status()
+    find = findings()
+    wp = find.get("wpcore") or {}
+    wp_items = wp.get("items", [])
+    extra = [i for i in wp_items if i.get("kind") == "extra_file"]
+    modified = [i for i in wp_items if i.get("kind") == "modified_core"]
+    base = [i for i in wp_items if i.get("kind") not in ("extra_file", "modified_core")]
+    top_sus = []
+    for it in (find.get("backdoor") or {}).get("items", [])[:20]:
+        top_sus.append({
+            "engine": "backdoor",
+            "path": it.get("path", ""),
+            "detail": "score %s" % it.get("score", "?"),
+            "is_wp_core_default": False,
+        })
+    for it in (find.get("imunify") or {}).get("items", [])[:20]:
+        p = it.get("path", "")
+        top_sus.append({
+            "engine": "imunify",
+            "path": p,
+            "detail": it.get("signature", "ImunifyAV"),
+            "is_wp_core_default": False,
+        })
+    for it in (find.get("malware") or {}).get("hits", [])[:20]:
+        p = it.get("path", "")
+        top_sus.append({
+            "engine": "maldet",
+            "path": p,
+            "detail": it.get("sig", "signature hit"),
+            "is_wp_core_default": False,
+        })
+    for it in extra[:20]:
+        top_sus.append({
+            "engine": "wpcore",
+            "path": it.get("path", ""),
+            "detail": "extra file di core WP",
+            "is_wp_core_default": False,
+        })
+    for it in modified[:20]:
+        top_sus.append({
+            "engine": "wpcore",
+            "path": it.get("path", ""),
+            "detail": "core WP dimodifikasi",
+            "is_wp_core_default": True,
+        })
+    return {
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "overall": classify_overall(find),
+        "status": st,
+        "counts": {
+            "backdoor": st.get("backdoor_flagged") or 0,
+            "imunify": st.get("imunify_count") or 0,
+            "malware": len((find.get("malware") or {}).get("hits", [])),
+            "wpcore": st.get("wpcore_flagged") or 0,
+            "wpcore_extra": len(extra),
+            "wpcore_modified": len(modified),
+            "wpcore_default_ok": len(base),
+            "quarantine": st.get("quarantined") or 0,
+            "whitelist": st.get("whitelisted") or 0,
+        },
+        "suspicious": top_sus[:60],
+    }
+
+
+def ssh_login_history(limit=80):
+    try:
+        limit = int(limit or 80)
+    except Exception:
+        limit = 80
+    limit = max(1, min(limit, 300))
+    raw = run(
+        "grep -hE 'sshd\\[[0-9]+\\]: Accepted ' /var/log/auth.log /var/log/auth.log.1 2>/dev/null | tail -n %d"
+        % limit
+    )
+    out = []
+    rgx = re.compile(
+        r"^([A-Z][a-z]{2}\s+\d+\s+\d+:\d+:\d+).*sshd\[\d+\]: Accepted ([a-zA-Z0-9_-]+) for (\S+) from ([0-9a-fA-F\.:]+)"
+    )
+    for ln in raw.splitlines():
+        m = rgx.search(ln)
+        if not m:
+            continue
+        out.append({
+            "when": m.group(1),
+            "method": m.group(2),
+            "user": m.group(3),
+            "ip": m.group(4),
+            "raw": ln.strip(),
+        })
+    out.reverse()
+    return {"items": out, "count": len(out)}
+
+
 # ---------- system info & service control ----------
 # Service yang boleh dikontrol dari panel (whitelist, hindari command injection).
 MANAGED_SERVICES = {
@@ -613,7 +726,39 @@ PAGE = load_page()
 class Handler(BaseHTTPRequestHandler):
     server_version = "ScanPanel"
 
+    def _parse_cookies(self):
+        raw = self.headers.get("Cookie", "")
+        out = {}
+        for part in raw.split(";"):
+            if "=" not in part:
+                continue
+            k, v = part.split("=", 1)
+            out[k.strip()] = v.strip()
+        return out
+
+    def _clean_sessions(self):
+        now = int(time.time())
+        expired = [tok for tok, ts in SESSIONS.items() if ts < now]
+        for tok in expired:
+            SESSIONS.pop(tok, None)
+
+    def _session_ok(self):
+        self._clean_sessions()
+        tok = self._parse_cookies().get("SPSESS", "")
+        if not tok:
+            return False
+        exp = SESSIONS.get(tok)
+        if not exp:
+            return False
+        if exp < int(time.time()):
+            SESSIONS.pop(tok, None)
+            return False
+        SESSIONS[tok] = int(time.time()) + SESSION_TTL
+        return True
+
     def _auth_ok(self):
+        if self._session_ok():
+            return True
         h = self.headers.get("Authorization", "")
         if not h.startswith("Basic "):
             return False
@@ -623,33 +768,39 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             return False
 
-    def _need_auth(self):
+    def _need_auth(self, api=False):
+        if api:
+            return self._json({"error": "unauthorized", "need_login": True}, 401)
         self.send_response(401)
         self.send_header("WWW-Authenticate", 'Basic realm="Panel Keamanan"')
         self.end_headers()
         self.wfile.write(b"Butuh login")
 
-    def _send(self, body, ctype="text/html; charset=utf-8", code=200):
+    def _send(self, body, ctype="text/html; charset=utf-8", code=200, extra_headers=None):
         b = body.encode("utf-8") if isinstance(body, str) else body
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(b)))
+        for k, v in (extra_headers or []):
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(b)
 
-    def _json(self, obj, code=200):
-        self._send(json.dumps(obj), "application/json; charset=utf-8", code)
+    def _json(self, obj, code=200, extra_headers=None):
+        self._send(json.dumps(obj), "application/json; charset=utf-8", code, extra_headers=extra_headers)
 
     def log_message(self, *a):
         pass
 
     def do_GET(self):
-        if not self._auth_ok():
-            return self._need_auth()
         u = urlparse(self.path)
         p = u.path
         if p in ("/", "/index.html"):
             return self._send(PAGE)
+        if p == "/api/auth/check":
+            return self._json({"ok": self._auth_ok()})
+        if not self._auth_ok():
+            return self._need_auth(api=True)
         if p == "/api/status":
             return self._json(get_status())
         if p == "/api/domains":
@@ -660,8 +811,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(job_detail(parse_qs(u.query).get("id", [""])[0]) or {"error": "not found"})
         if p == "/api/findings":
             return self._json(findings())
+        if p == "/api/report/summary":
+            return self._json(report_summary())
         if p == "/api/sysinfo":
             return self._json(sysinfo())
+        if p == "/api/ssh-logins":
+            lim = parse_qs(u.query).get("limit", ["80"])[0]
+            return self._json(ssh_login_history(lim))
         if p == "/api/wpusers":
             dom = parse_qs(u.query).get("domain", [cfg["DOMAIN_PATH"]])[0]
             return self._json(wpusers_cmd("list", dom))
@@ -683,11 +839,32 @@ class Handler(BaseHTTPRequestHandler):
             return {}
 
     def do_POST(self):
-        if not self._auth_ok():
-            return self._need_auth()
         u = urlparse(self.path)
         qs = parse_qs(u.query)
         p = u.path
+
+        if p == "/api/auth/login":
+            body = self._read_json_body()
+            uin = (body.get("username") or "").strip()
+            pin = body.get("password") or ""
+            if uin != USERNAME or pin != PASSWORD:
+                return self._json({"error": "username/password salah"}, 401)
+            tok = secrets.token_urlsafe(24)
+            SESSIONS[tok] = int(time.time()) + SESSION_TTL
+            return self._json({"ok": True, "user": USERNAME}, extra_headers=[
+                ("Set-Cookie", "SPSESS=%s; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=%d" % (tok, SESSION_TTL))
+            ])
+
+        if p == "/api/auth/logout":
+            tok = self._parse_cookies().get("SPSESS", "")
+            if tok:
+                SESSIONS.pop(tok, None)
+            return self._json({"ok": True}, extra_headers=[
+                ("Set-Cookie", "SPSESS=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0")
+            ])
+
+        if not self._auth_ok():
+            return self._need_auth(api=True)
 
         def g(name, default=""):
             return qs.get(name, [default])[0]

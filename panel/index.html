@@ -62,10 +62,72 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f4f6f9;color:#21252
 .probe-box.info{background:#cff4fc;border:1px solid #b6effb}
 .probe-box.secondary{background:#f8f9fa;border:1px solid #dee2e6}
 pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:1rem;font-size:.8rem;max-height:400px;overflow:auto}
+.login-shell{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f9fbff 0%,#eef4ff 40%,#ffffff 100%);padding:1.25rem}
+.login-card{width:min(980px,100%);border:0;border-radius:22px;box-shadow:0 20px 55px rgba(0,57,145,.12);overflow:hidden;background:#fff}
+.login-hero{background:linear-gradient(145deg,#0d6efd,#3c77ff 58%,#5f9bff);color:#fff;padding:2rem;height:100%}
+.login-hero h2{font-weight:700;letter-spacing:.2px}
+.login-feature{display:flex;gap:.7rem;align-items:flex-start;margin-bottom:.7rem;font-size:.92rem}
+.login-feature i{font-size:1rem;opacity:.95;margin-top:.15rem}
+.login-form-wrap{padding:2rem}
+.login-logo{width:52px;height:52px;border-radius:14px;background:#e7f1ff;color:#0d6efd;display:flex;align-items:center;justify-content:center;font-size:1.4rem}
+.metric-mini{border:1px solid #ecf0f7;border-radius:12px;padding:.8rem;background:#fff}
+.metric-mini .num{font-size:1.35rem;font-weight:700;color:#0d6efd;line-height:1.1}
 @media(max-width:768px){#sidebar{transform:translateX(-100%)}#sidebar.show{transform:translateX(0)}#main{margin-left:0}}
 </style>
 </head>
 <body>
+
+<div id="loginView" class="login-shell">
+  <div class="login-card">
+    <div class="row g-0">
+      <div class="col-lg-6 d-none d-lg-block">
+        <div class="login-hero">
+          <span class="badge rounded-pill text-bg-light text-primary mb-3">Security Intelligence Suite</span>
+          <h2 class="mb-2">Server Security Panel</h2>
+          <p class="mb-4 opacity-75">Platform anti-backdoor terintegrasi: scan, triage, quarantine, hardening, dan pelaporan PDF dalam satu dashboard.</p>
+          <div class="login-feature"><i class="bi bi-shield-check"></i><span>Engine sinergi: Backdoor heuristic, ImunifyAV, maldet, ClamAV, WP Core checksum.</span></div>
+          <div class="login-feature"><i class="bi bi-archive"></i><span>Quarantine terkontrol dengan whitelist aman untuk file bawaan WordPress.</span></div>
+          <div class="login-feature"><i class="bi bi-file-earmark-pdf"></i><span>Ekspor ringkasan keamanan PDF: status aman/tidak, lokasi mencurigakan, klasifikasi WP core.</span></div>
+          <div class="login-feature"><i class="bi bi-hdd-network"></i><span>Kontrol service (lsws, lscpd, dst), reboot server, dan audit login SSH.</span></div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="login-form-wrap">
+          <div class="d-flex align-items-center gap-3 mb-4">
+            <div class="login-logo"><i class="bi bi-shield-lock"></i></div>
+            <div>
+              <h5 class="mb-0 fw-semibold">Sign In</h5>
+              <div class="text-muted small">Secure access untuk administrator</div>
+            </div>
+          </div>
+          <form id="loginForm">
+            <div class="mb-3">
+              <label class="form-label small text-muted mb-1">Username</label>
+              <input id="loginUser" class="form-control form-control-lg" placeholder="scanadmin" autocomplete="username" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small text-muted mb-1">Password</label>
+              <div class="input-group input-group-lg">
+                <input id="loginPass" type="password" class="form-control" placeholder="••••••••••" autocomplete="current-password" required>
+                <button class="btn btn-outline-secondary" type="button" onclick="togglePass()"><i class="bi bi-eye"></i></button>
+              </div>
+            </div>
+            <div class="d-grid mb-3">
+              <button id="btnLogin" class="btn btn-primary btn-lg" type="submit"><i class="bi bi-box-arrow-in-right me-1"></i>Login to Dashboard</button>
+            </div>
+            <div id="loginErr" class="small text-danger"></div>
+          </form>
+          <div class="row g-2 mt-3">
+            <div class="col-6"><div class="metric-mini"><div class="num">9+</div><div class="small text-muted">Security modules</div></div></div>
+            <div class="col-6"><div class="metric-mini"><div class="num">24/7</div><div class="small text-muted">Realtime monitoring</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="appWrap" class="d-none">
 
 <nav id="sidebar">
   <div class="brand"><i class="bi bi-shield-check me-2"></i>Security Panel</div>
@@ -95,13 +157,36 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
     <div class="d-flex align-items-center gap-2">
       <label class="small text-muted mb-0">Domain:</label>
       <select id="domainsel" class="form-select form-select-sm" style="min-width:200px" onchange="onDomainChange()"></select>
+      <button class="btn btn-outline-danger btn-sm" onclick="logoutPanel()"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
     </div>
   </div>
 
   <div class="content">
     <!-- DASHBOARD -->
     <div class="page" id="page-dash">
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <button class="btn btn-outline-primary btn-sm" onclick="loadDashboardInteractive()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh Dashboard</button>
+        <button class="btn btn-danger btn-sm" onclick="downloadPdfSummary()"><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF Summary</button>
+      </div>
       <div class="row g-3 mb-4" id="statuscards"><div class="col-12 text-center py-4"><div class="spinner-border text-primary"></div></div></div>
+      <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white fw-semibold"><i class="bi bi-pie-chart text-primary me-2"></i>Distribusi Temuan Security</div>
+            <div class="card-body">
+              <canvas id="riskChart" height="220"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white fw-semibold"><i class="bi bi-stars text-primary me-2"></i>Security Insight</div>
+            <div class="card-body" id="securityInsight">
+              <div class="text-muted small">Memuat insight...</div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white fw-semibold"><i class="bi bi-activity me-2"></i>Job Sedang Berjalan</div>
         <div class="card-body" id="runningjobs"><span class="text-muted">Memuat...</span></div>
@@ -122,6 +207,17 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
               <th>Risiko</th><th>Username</th><th>Email</th><th>Role</th><th>Terdaftar</th><th>Catatan</th><th>Aksi</th>
             </tr></thead><tbody></tbody></table>
           </div>
+        </div>
+      </div>
+      <div class="card border-0 shadow-sm mt-4">
+        <div class="card-header bg-white d-flex align-items-center">
+          <span class="fw-semibold"><i class="bi bi-person-lock text-primary me-2"></i>SSH Login History</span>
+          <button class="btn btn-outline-primary btn-sm ms-auto" onclick="loadSshLogins()"><i class="bi bi-arrow-clockwise me-1"></i>Muat Ulang</button>
+        </div>
+        <div class="card-body">
+          <table id="tblSshLogins" class="table table-hover table-sm w-100">
+            <thead><tr><th>Waktu</th><th>User</th><th>IP</th><th>Metode</th></tr></thead><tbody></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -882,6 +978,7 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
     </div>
   </div>
 </div>
+</div>
 
 <!-- FILE DETAIL MODAL -->
 <div class="modal fade" id="fileDetailModal" tabindex="-1">
@@ -937,14 +1034,22 @@ pre.logbox{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
 var DOMAIN='ALL',FIND=null,curJob=null,jobTimer=null,WPUSERS=null,FD_PATH='',fdModal=null;
+var riskChart=null;
 var SEL_PATHS=new Set();
 var dtLang={search:'Cari:',lengthMenu:'Tampilkan _MENU_ data',info:'_START_-_END_ dari _TOTAL_',paginate:{previous:'&laquo;',next:'&raquo;'},emptyTable:'Tidak ada data',zeroRecords:'Tidak ditemukan'};
 var titles={dash:'Dashboard',scan:'Scan',findings:'Temuan Virus',system:'Scan Sistem',quar:'Karantina',whitelist:'Whitelist',jobs:'Riwayat Job','system-info':'Sistem & Server',docs:'Bantuan',updates:'Updates'};
 var dts={},jobsBusy=false;
 
-function api(p,o){return fetch(p,Object.assign({credentials:'same-origin'},o||{})).then(r=>r.json())}
+function api(p,o){
+  return fetch(p,Object.assign({credentials:'same-origin'},o||{})).then(function(r){
+    if(r.status===401){showLogin();throw new Error('unauthorized');}
+    return r.json();
+  });
+}
 function esc(s){return $('<div>').text(s==null?'':s).html()}
 function enc(s){return encodeURIComponent(s)}
 function ago(ts){var s=Math.floor(Date.now()/1000-ts);if(s<60)return s+' dtk';if(s<3600)return Math.floor(s/60)+' mnt';if(s<86400)return Math.floor(s/3600)+' jam';return Math.floor(s/86400)+' hr'}
@@ -952,6 +1057,38 @@ function scoreCls(s){return s>=12?'score-hi':(s>=8?'score-mid':'score-lo')}
 function toastOk(m){Swal.fire({toast:true,position:'top-end',icon:'success',title:m,showConfirmButton:false,timer:2500})}
 function toastErr(m){Swal.fire({toast:true,position:'top-end',icon:'error',title:m,showConfirmButton:false,timer:3500})}
 function confirmAct(title,text){return Swal.fire({title:title,text:text,icon:'question',showCancelButton:true,confirmButtonText:'Ya',cancelButtonText:'Batal',confirmButtonColor:'#dc3545'})}
+
+function showLogin(){
+  $('#appWrap').addClass('d-none');
+  $('#loginView').removeClass('d-none');
+}
+function showApp(){
+  $('#loginView').addClass('d-none');
+  $('#appWrap').removeClass('d-none');
+}
+function togglePass(){
+  var p=$('#loginPass');
+  p.attr('type',p.attr('type')==='password'?'text':'password');
+}
+function logoutPanel(){
+  api('/api/auth/logout',{method:'POST'}).finally(function(){showLogin();});
+}
+function doLogin(){
+  var u=$('#loginUser').val().trim(),p=$('#loginPass').val();
+  if(!u||!p){$('#loginErr').text('Username dan password wajib diisi');return;}
+  $('#btnLogin').prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span>Signing in...');
+  fetch('/api/auth/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
+    .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+    .then(function(x){
+      if(!x.ok){$('#loginErr').text((x.d&&x.d.error)||'Login gagal');return;}
+      $('#loginErr').text('');
+      showApp();
+      bootstrapApp();
+    })
+    .catch(function(){ $('#loginErr').text('Gagal terhubung ke server'); })
+    .finally(function(){ $('#btnLogin').prop('disabled',false).html('<i class="bi bi-box-arrow-in-right me-1"></i>Login to Dashboard'); });
+}
+$('#loginForm').on('submit',function(e){e.preventDefault();doLogin();});
 
 function btnDetail(p){return '<button class="btn btn-outline-primary btn-sm btn-act me-1" onclick="openFileDetail(\''+p+'\')"><i class="bi bi-search me-1"></i>Detail</button>'}
 function fileLink(path,enc,extra){return '<a href="#" class="path-cell text-primary path-link" onclick="openFileDetail(\''+enc+'\');return false"><i class="bi bi-file-earmark-code me-1"></i>'+esc(path)+'</a>'+(extra||'')}
@@ -1133,7 +1270,77 @@ function loadStatus(){api('/api/status').then(function(d){
     html+='</div></div></div></div>';
   });
   $('#statuscards').html(html);
+  loadDashboardInteractive();
 })}
+
+function loadDashboardInteractive(){
+  api('/api/report/summary').then(function(r){
+    var c=r.counts||{};
+    var labels=['Backdoor','ImunifyAV','Malware','WP Core'];
+    var data=[c.backdoor||0,c.imunify||0,c.malware||0,c.wpcore||0];
+    var colors=['#dc3545','#0d6efd','#ffc107','#6c757d'];
+    var ctx=document.getElementById('riskChart');
+    if(ctx){
+      if(riskChart)riskChart.destroy();
+      riskChart=new Chart(ctx,{type:'doughnut',data:{labels:labels,datasets:[{data:data,backgroundColor:colors,borderWidth:1}]},
+        options:{plugins:{legend:{position:'bottom'}},cutout:'62%'}});
+    }
+    var overall=r.overall||'PERLU TINJAU';
+    var ovClass=overall==='AMAN'?'success':(overall==='TIDAK AMAN'?'danger':'warning text-dark');
+    $('#securityInsight').html(
+      '<div class="mb-2">Status keseluruhan: <span class="badge bg-'+ovClass+'">'+esc(overall)+'</span></div>'
+      +'<ul class="small mb-0 ps-3">'
+      +'<li>WP extra file: <b>'+esc(c.wpcore_extra||0)+'</b> (bukan bawaan WordPress)</li>'
+      +'<li>WP modified core: <b>'+esc(c.wpcore_modified||0)+'</b> (file bawaan WP berubah)</li>'
+      +'<li>Quarantine aktif: <b>'+esc(c.quarantine||0)+'</b> file</li>'
+      +'<li>Whitelist aktif: <b>'+esc(c.whitelist||0)+'</b> file</li>'
+      +'</ul>');
+  });
+  loadSshLogins();
+}
+
+function loadSshLogins(){
+  api('/api/ssh-logins?limit=120').then(function(d){
+    var rows=(d.items||[]).map(function(x){
+      return [esc(x.when),'<span class="fw-semibold">'+esc(x.user)+'</span>',esc(x.ip),
+        '<span class="badge bg-light text-dark border">'+esc(x.method)+'</span>'];
+    });
+    initDT('tblSshLogins',{data:rows,order:[[0,'desc']]});
+  }).catch(function(){});
+}
+
+function downloadPdfSummary(){
+  api('/api/report/summary').then(function(r){
+    var jsPDF=window.jspdf.jsPDF;
+    var doc=new jsPDF({unit:'pt',format:'a4'});
+    var y=40;
+    function line(txt,size,bold){
+      doc.setFont('helvetica',bold?'bold':'normal');
+      doc.setFontSize(size||11);
+      var parts=doc.splitTextToSize(txt,520);
+      doc.text(parts,40,y); y+=parts.length*(size?size+4:15);
+      if(y>780){doc.addPage();y=40;}
+    }
+    var c=r.counts||{};
+    line('Security Scan Summary Report',18,true);
+    line('Generated: '+(r.generated_at||'-'),10,false); y+=6;
+    line('Overall Status: '+(r.overall||'PERLU TINJAU'),13,true); y+=4;
+    line('Temuan utama:',12,true);
+    line('- Backdoor: '+(c.backdoor||0));
+    line('- ImunifyAV: '+(c.imunify||0));
+    line('- Malware (maldet/ClamAV): '+(c.malware||0));
+    line('- WP Core anomaly: '+(c.wpcore||0));
+    line('- WP Extra (bukan bawaan): '+(c.wpcore_extra||0));
+    line('- WP Modified core (bawaan berubah): '+(c.wpcore_modified||0));
+    y+=4; line('Daftar lokasi mencurigakan:',12,true);
+    (r.suspicious||[]).slice(0,30).forEach(function(s,i){
+      var wp=s.is_wp_core_default?'[WP bawaan/modified]':'[non-bawaan]';
+      line((i+1)+'. '+(s.path||'-')+' '+wp+' - '+(s.detail||''),10,false);
+    });
+    doc.save('security-summary-'+(new Date().toISOString().slice(0,10))+'.pdf');
+    toastOk('PDF summary berhasil dibuat');
+  });
+}
 
 function refreshRunningJobs(){api('/api/jobs').then(function(d){
   var run=(d.jobs||[]).filter(function(j){return j.status==='berjalan'});
@@ -1604,10 +1811,21 @@ function wlRemove(p){confirmAct('Hapus dari whitelist?','').then(function(r){
   api('/api/whitelist/remove?path='+p,{method:'POST'}).then(function(d){toastOk('Dihapus.');loadFindings();loadStatus()});
 })}
 
-loadDomains();loadStatus();refreshRunningJobs();
-setInterval(loadStatus,15000);
-setInterval(refreshRunningJobs,5000);
-setInterval(function(){if(!$('#page-jobs').hasClass('d-none'))loadJobs()},5000);
+var appBooted=false;
+function bootstrapApp(){
+  if(appBooted)return;
+  appBooted=true;
+  loadDomains();loadStatus();refreshRunningJobs();
+  setInterval(loadStatus,15000);
+  setInterval(refreshRunningJobs,5000);
+  setInterval(function(){if(!$('#page-jobs').hasClass('d-none'))loadJobs()},5000);
+}
+fetch('/api/auth/check',{credentials:'same-origin'})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d&&d.ok){showApp();bootstrapApp();}
+    else showLogin();
+  }).catch(function(){showLogin();});
 </script>
 </body>
 </html>
