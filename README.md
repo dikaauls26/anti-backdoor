@@ -19,7 +19,7 @@ Panel keamanan web untuk server Linux (Ubuntu/Debian) dengan CyberPanel, OpenLit
 - Root access
 - Minimal 1 GB RAM (AIDE baseline butuh waktu & disk)
 
-## Instalasi cepat
+## Instalasi cepat (server baru — 1x run)
 
 ```bash
 git clone https://github.com/dikaauls26/anti-backdoor.git
@@ -27,16 +27,27 @@ cd anti-backdoor
 sudo bash install.sh
 ```
 
-Installer akan:
+Itu saja. `install.sh` otomatis menjalankan semuanya:
 
-1. Memasang ClamAV, maldet, rkhunter, AIDE, Lynis, **ImunifyAV**, dan dependensi
-2. Mengatur update signature ClamAV via `cvdupdate`
-3. Mendaftarkan hook ImunifyAV → panel karantina
-4. Menyalin panel ke `/usr/local/maldetect-panel/`
-5. Membuat kredensial acak + sertifikat SSL self-signed
-6. Mendaftarkan service `scanpanel` (systemd) dan cron harian + sync Imunify 15 menit
+1. Install dependensi (ClamAV, maldet, rkhunter, AIDE, Lynis, ImunifyAV, git, dll.)
+2. Update signature ClamAV via `cvdupdate`
+3. Deploy panel ke `/usr/local/maldetect-panel/`
+4. Buat kredensial acak + SSL self-signed
+5. Register service `scanpanel` (systemd) + cron harian
+6. Buka firewall port **9793/tcp** (firewalld/ufw)
+7. Auto-detect `DOMAIN_PATH` dari `/home/*/public_html` pertama
+8. Health check API panel
 
-Setelah selesai, buka `https://<IP-SERVER>:9793` di browser.
+Di akhir install, username/password ditampilkan di terminal. Buka `https://<IP-SERVER>:9793`.
+
+### Update panel (server yang sudah terpasang)
+
+```bash
+cd /root/anti-backdoor   # atau path clone kamu
+sudo bash scripts/deploy-update.sh
+```
+
+Kredensial lama dipertahankan saat reinstall/update.
 
 ## Struktur repo
 
