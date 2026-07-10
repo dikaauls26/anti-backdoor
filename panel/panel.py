@@ -1090,11 +1090,36 @@ class Handler(BaseHTTPRequestHandler):
         return self._json({"error": "aksi tidak dikenal"}, 404)
 
 
+class TLSThreadingHTTPServer(ThreadingHTTPServer):
+    """Bungkus TLS per-koneksi di worker thread, bukan di listening socket.
+
+    Kalau listening socket yang dibungkus SSL, handshake terjadi saat accept()
+    di main thread; satu klien lambat/nakal bisa membekukan serve_forever dan
+    membuat panel tak bisa diakses. Dengan membungkus di finish_request (yang
+    dijalankan di thread terpisah oleh ThreadingMixIn), main loop tetap responsif.
+    """
+
+    daemon_threads = True
+    ssl_ctx = None
+
+    def finish_request(self, request, client_address):
+        try:
+            request.settimeout(30)
+            request = self.ssl_ctx.wrap_socket(request, server_side=True)
+        except Exception:
+            try:
+                request.close()
+            except Exception:
+                pass
+            return
+        super().finish_request(request, client_address)
+
+
 def main():
-    httpd = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(CERT)
-    httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
+    httpd = TLSThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+    httpd.ssl_ctx = ctx
     print("Panel Keamanan aktif di https://0.0.0.0:%d" % PORT)
     httpd.serve_forever()
 
