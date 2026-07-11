@@ -30,6 +30,29 @@ ImunifyAV scan  →  temuan masuk tab "ImunifyAV"
 | **Lynis** | Audit hardening | Saran only |
 | **Panel Karantina** | Isolasi file berbahaya | ✅ Manual 1-klik |
 
+## CyberPanel: jangan uninstall MariaDB
+
+`install.sh` versi lama memasang paket Ubuntu `mysql-client`. Di server CyberPanel
+(MariaDB dari repo MariaDB.org), APT menganggap itu konflik dan **menghapus**
+`mariadb-server`, `mariadb-client`, dan `mariadb-client-core` saat install.
+
+Log apt tipikal:
+
+```
+Commandline: apt-get install ... mysql-client ...
+Remove: mariadb-server, mariadb-client-core, mariadb-client
+```
+
+Perbaikan (sudah di `install.sh`):
+
+1. Deteksi CyberPanel (`/usr/local/CyberCP`, service `lscpd`) atau paket MariaDB terpasang
+2. Pasang `mariadb-client` — **bukan** `mysql-client` Ubuntu
+3. `safe_apt_install`: jalankan `apt-get -s` dulu; batalkan jika ada baris `Remv` yang
+   menyentuh mariadb/mysql-server
+
+Data di `/var/lib/mysql` biasanya masih utuh setelah uninstall paket; cukup reinstall
+`mariadb-server mariadb-client` lalu start service.
+
 ## Scan Sinergi (disarankan)
 
 Jalankan dari panel → **Scan Sinergi** atau CLI:

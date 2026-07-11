@@ -149,6 +149,21 @@ Lihat [NOTES.md](NOTES.md) untuk arsitektur mixing ImunifyAV + karantina panel.
 - Batasi port 9793 di firewall hanya untuk IP admin
 - Sertifikat self-signed — gunakan reverse proxy + Let's Encrypt jika perlu
 
+## CyberPanel / MariaDB
+
+**Penting:** Jangan pasang `mysql-client` dari repo Ubuntu di server CyberPanel — APT akan
+**menghapus `mariadb-server`** karena konflik paket. Installer v2+ mendeteksi CyberPanel
+otomatis dan memakai `mariadb-client` saja, plus simulasi `apt-get -s` sebelum install agar
+tidak ada paket database yang ter-uninstall tanpa sengaja.
+
+Jika MariaDB sudah terhapus karena versi lama installer:
+
+```bash
+apt-get install -y mariadb-server mariadb-client
+systemctl start mariadb
+mysql -e "SHOW DATABASES;"
+```
+
 ## Lisensi
 
 MIT — gunakan dan modifikasi sesuai kebutuhan.

@@ -14,6 +14,62 @@ PANEL_PORT=9793
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 die() { log "ERROR: $*"; exit 1; }
 
+# CyberPanel memakai MariaDB dari repo MariaDB.org. Paket mysql-client (MySQL 8 Ubuntu)
+# bentrok dan membuat apt MENGHAPUS mariadb-server — jangan pernah pasang mysql-client di stack ini.
+is_cyberpanel() {
+    [[ -d /usr/local/CyberCP ]] || [[ -x /usr/local/lscp/bin/lscpd ]] || \
+        systemctl list-unit-files lscpd.service 2>/dev/null | grep -qE '^lscpd\.service'
+}
+
+mariadb_stack_present() {
+    dpkg-query -W -f='${Status}\n' mariadb-server mariadb-client 2>/dev/null | grep -q '^install ok installed'
+}
+
+safe_apt_install() {
+    local pkgs=("$@")
+    [[ ${#pkgs[@]} -gt 0 ]] || return 0
+    local sim removed
+    sim=$(apt-get -s install -y "${pkgs[@]}" 2>&1 || true)
+    removed=$(echo "$sim" | grep '^Remv ' || true)
+    if [[ -n "$removed" ]]; then
+        log "KONFLIK APT — install ${pkgs[*]} akan menghapus paket:"
+        echo "$removed" | tee -a "$LOG"
+        if echo "$removed" | grep -qiE 'mariadb|mysql-server|mariadb-server'; then
+            die "Instalasi dibatalkan: MariaDB/MySQL server akan ter-uninstall. Lihat $LOG"
+        fi
+        die "Instalasi dibatalkan karena konflik paket. Lihat $LOG"
+    fi
+    apt-get install -y -qq "${pkgs[@]}"
+}
+
+install_db_client() {
+    if is_cyberpanel || mariadb_stack_present; then
+        log "CyberPanel/MariaDB terdeteksi — memasang mariadb-client (bukan mysql-client Ubuntu)"
+        safe_apt_install mariadb-client
+        return
+    fi
+    log "Memasang klien MySQL/MariaDB..."
+    local sim
+    sim=$(apt-get -s install -y mysql-client 2>&1 || true)
+    if echo "$sim" | grep -qE '^Remv .*mariadb|^Remv .*mysql-server'; then
+        log "mysql-client Ubuntu bentrok dengan MariaDB — memakai mariadb-client"
+        safe_apt_install mariadb-client
+        return
+    fi
+    safe_apt_install mysql-client
+}
+
+verify_database_stack() {
+    if ! is_cyberpanel && ! mariadb_stack_present; then
+        return 0
+    fi
+    if systemctl is-active --quiet mariadb 2>/dev/null || systemctl is-active --quiet mysql 2>/dev/null; then
+        log "MariaDB/MySQL service: aktif"
+        return 0
+    fi
+    log "PERINGATAN: MariaDB tidak aktif — coba: apt-get install -y mariadb-server mariadb-client && systemctl start mariadb"
+}
+
 [[ $EUID -eq 0 ]] || die "Jalankan sebagai root: sudo bash install.sh"
 
 if [[ -f /etc/os-release ]]; then
@@ -34,19 +90,16 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 
 log "[2/9] Menginstal dependensi..."
-apt-get install -y -qq \
-    git \
-    clamav clamav-daemon \
-    aide aide-common \
-    lynis rkhunter \
-    python3 python3-pip \
-    openssl curl wget tar inotify-tools jq \
-    mysql-client \
-    ca-certificates \
-    firewalld ufw 2>/dev/null || apt-get install -y -qq \
-    git clamav clamav-daemon aide aide-common lynis rkhunter \
-    python3 python3-pip openssl curl wget tar inotify-tools jq \
-    mysql-client ca-certificates
+BASE_PKGS=(
+    git clamav clamav-daemon aide aide-common lynis rkhunter
+    python3 python3-pip openssl curl wget tar inotify-tools jq ca-certificates
+)
+safe_apt_install "${BASE_PKGS[@]}"
+for opt in firewalld ufw; do
+    apt-get install -y -qq "$opt" >>"$LOG" 2>&1 || log "Peringatan: $opt tidak terpasang (opsional)"
+done
+install_db_client
+verify_database_stack
 
 # rkhunter: allow web-based checks (panel may probe URLs)
 if grep -q '^WEB_CMD=' /etc/rkhunter.conf 2>/dev/null; then
